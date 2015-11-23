@@ -19,9 +19,13 @@ def getEc2Elbs(ec2, elbName):
 	elbs = []
 	for lb in loadBalancers['LoadBalancerDescriptions']:
 		elb = arsedefs.Ec2Elb(lb['LoadBalancerName'])
-		elb.dnsName = lb['DNSName'],
-		elb.vpcId = lb['VPCId'],
-		elb.zones = lb['AvailabilityZones']
+		elb.availabilityZones = lb['AvailabilityZones']
+		elb.created = lb['CreatedTime']
+		elb.dnsName = lb['DNSName']
+		elb.policies = lb['Policies']
+		elb.securityGroups = lb['SecurityGroups']
+		elb.subnets = lb['Subnets']
+		elb.vpcId = lb['VPCId']
 
 		# Loop over instances to which ELB is attached
 		instances = []
@@ -128,7 +132,7 @@ def getEc2SecurityGroups(ec2, securityGroupId):
 		return groups[0]
 # Get a list of volumes or a single volumes and return an Ec2Volume object
 #  or array of Ec2Volume objects
-def getEc2Volume(ec2, volumeId):
+def getEc2Volumes(ec2, volumeId):
 	try:
 		if volumeId == "all":
 			volumes = ec2.describe_volumes()
@@ -150,14 +154,22 @@ def getEc2Volume(ec2, volumeId):
 					tagName = tag['Value']
 
 		returnedVolume.availabilityZone = volume['AvailabilityZone']
-		returnedVolume.attached['attachDevice'] = volume['Attachments'][0]['Device']
-		returnedVolume.attached['attachInstanceId'] = volume['Attachments'][0]['InstanceId']
-		returnedVolume.attached['attachTime'] = volume['Attachments'][0]['AttachTime']
-		#
-		# So, in order to make this work we're going to have to probably make an array of all instance IDs
-		#   then ec2.describe_instances(instanceIDs=[thatarray]). Iterate over that and put the hostname
-		#   tags in the volume objects
-		returnedVolume.attached['attachHostname'] = returnedVolume.attached['attachInstanceId']
+
+		# If a volume is not attached to an instance, the array of attachments will exist
+		#	but will be of course length of 0
+		if len(volume['Attachments']) > 0:
+			returnedVolume.attached['attachDevice'] = volume['Attachments'][0]['Device']
+			returnedVolume.attached['attachInstanceId'] = volume['Attachments'][0]['InstanceId']
+			returnedVolume.attached['attachTime'] = volume['Attachments'][0]['AttachTime']
+			#
+			# So, in order to make this work we're going to have to probably make an array of all instance IDs
+			#   then ec2.describe_instances(instanceIDs=[thatarray]). Iterate over that and put the hostname
+			#   tags in the volume objects. Otherwise it's going to be N + a few API calls where N is the number of volumes. 
+			returnedVolume.attached['attachHostname'] = returnedVolume.attached['attachInstanceId']
+		else:
+			returnedVolume.attached['attachInstanceId'] = 'detached'
+			returnedVolume.attached['attachHostname'] = 'detached'
+
 		returnedVolume.size = volume['Size']
 		returnedVolume.state = volume['State']
 		returnedVolume.tagName = tagName
@@ -181,7 +193,10 @@ def displayEc2Elbs(ec2, lbName):
 	print("===================================================================================================")
 
 	for elb in elbs:
-		elb.printShort()		
+		elb.printShort()
+
+		if lbName != '':
+			elb.printLong()
 #
 #
 def displayEc2KeyPairs(ec2):
@@ -198,10 +213,10 @@ def displayEc2KeyPairs(ec2):
 #
 #
 def displayEc2SecurityGroups(ec2, securityGroupId):
-	#try:
-	groups = getEc2SecurityGroups(ec2, securityGroupId)
-	# except Exception as e:
-	# 	sys.exit("Get Security Groups query failure: " + str(e[0]))
+	try:
+		groups = getEc2SecurityGroups(ec2, securityGroupId)
+	except Exception as e:
+	 	sys.exit("Get Security Groups query failure: " + str(e[0]))
 
 	if isinstance(groups, collections.Sequence):
 		print " ID:          Name:                    Description"
@@ -215,7 +230,7 @@ def displayEc2SecurityGroups(ec2, securityGroupId):
 # 
 def displayEc2Volumes(ec2, volumeId):
 	try:
-		volumes = getEc2Volume(ec2, volumeId)
+		volumes = getEc2Volumes(ec2, volumeId)
 	except Exception as e:
 		sys.exit("getVolumes query failure: " + str(e[0]))
 

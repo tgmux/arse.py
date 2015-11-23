@@ -22,37 +22,45 @@ class Ec2Elb:
 	'Common base class for EC2 Elastic Loadbalancers'
 
 	def __init__(self, elbName):
+		self.availabilityZones = []
+		self.created = ''
 		self.elbName = elbName
 		self.dnsName = ''
+		self.healthCheck = ''
 		self.instances = []
 		self.listeners = []
+		self.policies = ''
+		self.securityGroups = []
+		self.subnets = []
 		self.vpcId = ''
-		self.zones = []
 
 	def printShort(self):
 		print ("{vpcid:<13} {lbname:<24} {zones:<29} {dnsname}".format(
 			lbname=Style.BRIGHT + self.elbName + Style.RESET_ALL,
-			dnsname=self.dnsName[0],
-			vpcid=self.vpcId[0],
-			zones=str(self.zones)))
+			dnsname=self.dnsName,
+			vpcid=self.vpcId,
+			zones=str(self.availabilityZones)))
 
 	def printLong(self):
-		print ("{vpcid:<13} {lbname:<24} {zones:<28} {dnsname}".format(
-			lbname=Style.BRIGHT + self.elbName + Style.RESET_ALL,
-			dnsname=self.dnsName[0],
-			vpcid=self.vpcId[0],
-			zones=str(self.zones)))
+		print("- Created: {created}".format(
+			created=str(self.created)))
 
-		print "- " + str(self.instances)
+		print "\n--[ Networking ]----------------------"
+		print(" - {vpcId}\n - {groups}\n - {subnets}".format(
+			groups=str(self.securityGroups),
+			subnets=str(self.subnets),
+			vpcId=self.vpcId))
 
+		print "\n--[ Listeners ]-----------------------"
 		for listener in self.listeners:
-			print("    {lbprotocol:<14} {lbport:<15} -> {iprotocol:<14} {iport:<15}".format(
+			print(" > {lbprotocol:<8} {lbport:<6} :: {iprotocol:<8} {iport:<6}".format(
 				lbport=listener.lbPort,
 				lbprotocol=listener.lbProtocol,
 				iport=listener.instancePort,
 				iprotocol=listener.instanceProtocol))
 
-
+		print "\n--[ Policies ]------------------------"
+		print str(self.policies)
 
 class Ec2ElbListener:
 	def __init__(self):
@@ -63,7 +71,7 @@ class Ec2ElbListener:
 
 class Ec2SecurityGroup:
 	'Common base class for EC2 Security Groups'
-	
+
 	def __init__(self, securityGroupId):
 		self.securityGroupId = securityGroupId
 		self.name = ''
@@ -75,13 +83,13 @@ class Ec2SecurityGroup:
 			name=self.name,
 			id=self.securityGroupId,
 			description=self.description)
-	
+
 	def printLong(self):
 		print(" {id:<12s} {name:<24s} {description}\n").format(
 			name=self.name,
 			id=self.securityGroupId,
 			description=self.description)
-		
+
 		for permission in self.permissions:
 			print ("  {type:<9} {protocol:<14}  {fromPort:<6}  {toPort:<6} {ranges}".format(
 				type=permission.type,
@@ -119,7 +127,7 @@ class Ec2Volume:
 		self.volumeType = ''
 
 	def printShort(self):
-		self.combinedInstanceName = (self.attached['attachInstanceId'] + 
+		self.combinedInstanceName = (self.attached['attachInstanceId'] +
 			" (" + str(self.attached['attachHostname']) + ")")
 		print (" {volumeId:<12}  {instance:<24} {size:<4} {device:<10} {state:<9} {zone}  {tagname}".format(
 				zone=self.availabilityZone,
