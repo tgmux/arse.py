@@ -1,4 +1,4 @@
-#! /usr/local/bin/python
+#! /usr/bin/python
 import arsedefs
 import boto3
 import collections
@@ -16,6 +16,7 @@ def getEc2Elbs(ec2, elbName):
 	except Exception as e:
 		sys.exit("Elastic Load Balancer query failure: " + str(e[0]))
 
+	# Iterate through the returned loadbalancers
 	elbs = []
 	for lb in loadBalancers['LoadBalancerDescriptions']:
 		elb = arsedefs.Ec2Elb(lb['LoadBalancerName'])
@@ -42,6 +43,7 @@ def getEc2Elbs(ec2, elbName):
 			elbListener.instancePort = listener['Listener']['InstancePort']
 			elbListener.instanceProtocol = listener['Listener']['InstanceProtocol']
 			elbListeners.append(elbListener)
+			
 		elb.listeners = elbListeners
 		elbs.append(elb)
 
@@ -49,6 +51,57 @@ def getEc2Elbs(ec2, elbName):
 	return elbs
 	# else:
 	# 	return elbs[0]
+
+#
+# Display all EC2 AMIs
+def getEc2Images(ec2):
+	try:
+		diskImages = ec2.describe_images(Owners=['self'])
+	except Exception as e:
+		sys.exit("Images query failure: " + str(e[0]))
+
+	images = []
+	for ami in diskImages['Images']:
+		image = arsedefs.Ec2Image()
+		image.imageId = ami['ImageId']
+		image.name = ami['Name']
+		image.virtualizationType = ami['VirtualizationType']
+		image.created = ami['CreationDate']
+		images.append(image)
+
+	return images
+
+#
+#
+def getEc2Instances(ec2):
+	try:
+		reservations = ec2.describe_instances()
+	except Exception as e:
+		sys.exit("Instance reservation query failure: " + str(e[0]))
+
+	instances = []
+	for reservation in reservations['Reservations']:
+		for inst in reservation['Instances']:
+			instance = arsedefs.Ec2Instance(inst['InstanceId'])
+			for tag in inst['Tags']:
+				if tag['Key'] == 'Name':
+					inst['NameFromTag'] = tag['Value']
+
+			if 'PrivateIpAddress' in inst:
+				inst['VerifiedIp'] = inst['PrivateIpAddress']
+			else:
+				inst['VerifiedIp'] = 'n/a'
+
+			instance.name = inst['NameFromTag']
+			instance.itype = inst['InstanceType']
+			instance.vtype = inst['VirtualizationType']
+			instance.zone = inst['Placement']['AvailabilityZone']
+			instance.state = inst['State']['Name']
+			instance.ip = inst['VerifiedIp']
+			instances.append(instance)
+
+	return instances
+
 #
 # Request EC2 SSH Key Pairs from AWS API
 def getEc2KeyPairs(ec2):
@@ -167,8 +220,8 @@ def getEc2Volumes(ec2, volumeId):
 			#   tags in the volume objects. Otherwise it's going to be N + a few API calls where N is the number of volumes. 
 			returnedVolume.attached['attachHostname'] = returnedVolume.attached['attachInstanceId']
 		else:
-			returnedVolume.attached['attachInstanceId'] = 'detached'
-			returnedVolume.attached['attachHostname'] = 'detached'
+			returnedVolume.attached['attachInstanceId'] = ' detached '
+			returnedVolume.attached['attachHostname'] = ' detached '
 
 		returnedVolume.size = volume['Size']
 		returnedVolume.state = volume['State']
@@ -197,6 +250,28 @@ def displayEc2Elbs(ec2, lbName):
 
 		if lbName != '':
 			elb.printLong()
+#
+#
+def displayEc2Images(ec2):
+	try:
+		images = getEc2Images(ec2)
+	except Exception as e:
+		sys.exit("getEc2Images query failure: " + str(e[0]))
+
+	print("{0:<14s} {1:<70s} {2:<7s} {3:<30s}".format("ID:", "Name:", "vType:", "Creation Date:"))
+	print "======================================================================================================================"
+	for image in images:
+		image.printShort()
+#
+#
+def displayEc2Instances(ec2):
+	try:
+		instances = getEc2Instances(ec2)
+	except Exception as e:
+		sys.exit("getInstances query failure: " + str(e[0]))
+
+	for instance in instances:
+		instance.printLong()
 #
 #
 def displayEc2KeyPairs(ec2):
@@ -259,9 +334,9 @@ def main():
 		else: 
 			# Initialize the AWS client object
 			if re.search('^elb', clOption):
-				ec2 = boto3.client('elb')
+				ec2 = boto3.client('elb', region_name='us-east-1')
 			else:
-				ec2 = boto3.client('ec2')
+				ec2 = boto3.client('ec2', region_name='us-east-1')
 
 			# We don't need no stinkin argparse
 			#
@@ -270,7 +345,11 @@ def main():
 				displayEc2Elbs(ec2, '')
 			elif re.search('^elb\-', clOption):
 				displayEc2Elbs(ec2, clOption.lstrip('elb-'))
-			# 
+			#
+			elif clOption == "images":
+				displayEc2Images(ec2)
+			elif clOption == "instances":
+				displayEc2Instances(ec2) 
 			elif clOption == "keys":
 				displayEc2KeyPairs(ec2)
 			elif clOption == "security":

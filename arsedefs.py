@@ -1,23 +1,5 @@
 from colorama import Fore, Back, Style, init
 
-class Ec2KeyPair:
-	'Common base class for EC2 key pairs'
-
-	def __init__(self):
-		self.name = ''
-		self.fingerprint = ''
-
-	def printLong(self):
-		print("{name:<12s} {fingerprint}".format(
-			name=self.name,
-			fingerprint=self.fingerprint))
-
-class Ec2Instance:
-	'Common base class for EC2 Instances'
-
-	def __init__(self, instanceId):
-		self.instanceId = instanceId
-
 class Ec2Elb:
 	'Common base class for EC2 Elastic Loadbalancers'
 
@@ -69,6 +51,58 @@ class Ec2ElbListener:
 		self.lbPort = ''
 		self.lbProtocol = ''
 
+class Ec2Image:
+	'Common base class for EC2 AMIs'
+
+	def __init__(self):
+		self.imageId = ''
+		self.name = ''
+		self.virtualizationType = ''
+		self.created = ''
+
+	def printShort(self):
+		print("{id:<14s} {name:<70s} {vtype:<7s} {date:<30s}".format(
+			id=self.imageId,
+			name=self.name,
+			vtype=self.virtualizationType[:5],
+			date=self.created))
+
+class Ec2Instance:
+	'Common base class for EC2 Instances'
+
+	def __init__(self, instanceId):
+		self.instanceId = instanceId
+		self.name = ''
+		self.itype = ''
+		self.vtype = ''
+		self.zone = ''
+		self.state = ''
+		self.ip = ''
+		self.reason = ''
+		self.launchtime = ''
+
+	def printLong(self):
+		print(" {name:<31s} {id:<12s} {itype:<10s} [{vtype:<4s}]  {zone}  {state:<20}  {ip}".format(
+				name=self.name[:30],
+				id=self.instanceId,
+				itype=self.itype,
+				vtype=self.vtype[:4],
+				zone=self.zone,
+				state=self.state,
+				ip=self.ip))
+
+class Ec2KeyPair:
+	'Common base class for EC2 key pairs'
+
+	def __init__(self):
+		self.name = ''
+		self.fingerprint = ''
+
+	def printLong(self):
+		print("{name:<12s} {fingerprint}".format(
+			name=self.name,
+			fingerprint=self.fingerprint))
+
 class Ec2SecurityGroup:
 	'Common base class for EC2 Security Groups'
 
@@ -118,7 +152,7 @@ class Ec2Volume:
 			'attachInstanceId': '',
 			'attachTime': ''}
 		self.availabilityZone = ''
-		self.createTime = ''
+		self.created = ''
 		self.name = ''
 		self.size = ''
 		self.state = ''
@@ -127,9 +161,17 @@ class Ec2Volume:
 		self.volumeType = ''
 
 	def printShort(self):
+		# Color it. 
+		if self.state == 'in-use':
+			self.state = Fore.GREEN + 'in-use' + Fore.RESET
+		elif self.state == 'available': 
+			self.state = Fore.CYAN + 'available' + Fore.RESET
+		else:
+			self.state = Fore.Red + self.state + Fore.RESET
+
 		self.combinedInstanceName = (self.attached['attachInstanceId'] +
 			" (" + str(self.attached['attachHostname']) + ")")
-		print (" {volumeId:<12}  {instance:<24} {size:<4} {device:<10} {state:<9} {zone}  {tagname}".format(
+		print (" {volumeId:<12}  {instance:<24} {size:<4} {device:<10} {state:<19} {zone}  {tagname}".format(
 				zone=self.availabilityZone,
 				volumeId=self.volumeId,
 				instance=self.combinedInstanceName,
@@ -151,9 +193,9 @@ def printHelp():
 	print "-------------------------------------------------------"
 	print "  elb            - EC2 Elastic Loadbalancer List"
 	print "  elb-<name>     - Verbose EC2 ELB Display"
-	print "  *images        - EC2 AMI List"
+	print "  images         - EC2 AMI List"
 	print "  *ami-xxxxxxxx  - Verbose EC2 AMI Display"
-	print "  *instances     - EC2 Instance List"
+	print "  instances      - EC2 Instance List"
 	print "  *i-xxxxxxxx    - Verbose EC2 Instance Display"
 	print "  keys           - EC2 SSH Keys"
 	print "  security       - EC2 Security Groups"
