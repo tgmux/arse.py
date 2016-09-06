@@ -157,7 +157,7 @@ class Ec2Volume:
 	'Class to describe EC2 EBS Volumes'
 
 	def __init__(self, volumeId):
-		self.account = ''
+		self.awsAccount = ''
 		self.attached = {
 			'attachDevice': '',
 			'attachHostname': '',
@@ -183,7 +183,8 @@ class Ec2Volume:
 
 		self.combinedInstanceName = (self.attached['attachInstanceId'] +
 			" (" + str(self.attached['attachHostname']) + ")")
-		print (" {volumeId:<12}  {instance:<24} {size:<4} {device:<10} {state:<19} {zone}  {tagname}".format(
+		print (" {account:<9s} {volumeId:<22}  {instance:<41} {size:<5} {device:<10} {state:<19} {zone:<16}  {tagname}".format(
+				account=self.awsAccount,
 				zone=self.availabilityZone,
 				volumeId=self.volumeId,
 				instance=self.combinedInstanceName,
@@ -285,6 +286,7 @@ def getEc2Volumes(awsAccount, awsRegion, session, volumeId):
 		returnedVolume.size = volume['Size']
 		returnedVolume.state = volume['State']
 		returnedVolume.tagName = tagName
+		returnedVolume.awsAccount = awsAccount['account']
 
 		returnedVolumes.append(returnedVolume)
 
@@ -296,6 +298,10 @@ def printHeader(headerStyle):
 		print("{0:<10s} {1:<32s} {2:<21s} {3:<11s} {4:<5s}  {5:<16s} {6:<7s}  {7}".format(
 	 		"Acct:", "Name:", "ID:", "iType:", "vType:", "Zone:", "State:", "IP:"))
 	 	print "============================================================================================================================="
+	elif headerStyle == "volumes":
+		print ("{0:<10s} {1:<23} {2:<41} {3:<5} {4:<10} {5:<9} {6:<17} {7}".format(
+			"Acct:", "ID:", "Attached:", "GB:", "Device:", "Status:", "Zone:", "Name:"))
+		print "============================================================================================================================="		
 #
 #
 def printHelp():

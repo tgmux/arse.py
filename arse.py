@@ -229,7 +229,7 @@ def main():
 		#
 		# Loop through aws accounts - specify something on the cli later
 		resources = []
-		sys.stdout.write("*Searching AWS Accounts: ")
+		sys.stdout.write(" Searching AWS Accounts: ")
 		sys.stdout.flush()
 		for awsAccount in arseConfig['configurations']:
 			sys.stdout.write(awsAccount['account'] + ' ')
@@ -252,6 +252,7 @@ def main():
 				 		volumes = arsedefs.getEc2Volumes(awsAccount, awsRegion, session, '')
 				 	except Exception as e:
 						sys.exit("getVolumes query failure: " + str(e[0]))
+					resources.append(volumes)
 		#
 		# Display the data we've received
 		print ""
