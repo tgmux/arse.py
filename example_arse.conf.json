@@ -1,0 +1,12 @@
+{
+	"configurations": [{
+		"account": "foo",
+		"regions": ["us-east-1", "ap-northeast-1"]
+	}, {
+		"account": "bar",
+		"regions": ["us-east-1", "us-west-2"]
+	}, {
+		"account": "baz",
+		"regions": ["us-east-1"]
+	}]
+}

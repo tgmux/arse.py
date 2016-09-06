@@ -3,6 +3,7 @@ import arsedefs
 import boto3
 import collections
 from colorama import Fore, Back, Style, init
+import json
 import re
 import sys
 #
@@ -70,38 +71,6 @@ def getEc2Images(ec2):
 		images.append(image)
 
 	return images
-
-#
-#
-def getEc2Instances(ec2):
-	try:
-		reservations = ec2.describe_instances()
-	except Exception as e:
-		sys.exit("Instance reservation query failure: " + str(e[0]))
-
-	instances = []
-	for reservation in reservations['Reservations']:
-		for inst in reservation['Instances']:
-			instance = arsedefs.Ec2Instance(inst['InstanceId'])
-			for tag in inst['Tags']:
-				if tag['Key'] == 'Name':
-					inst['NameFromTag'] = tag['Value']
-
-			if 'PrivateIpAddress' in inst:
-				inst['VerifiedIp'] = inst['PrivateIpAddress']
-			else:
-				inst['VerifiedIp'] = 'n/a'
-
-			instance.name = inst['NameFromTag']
-			instance.itype = inst['InstanceType']
-			instance.vtype = inst['VirtualizationType']
-			instance.zone = inst['Placement']['AvailabilityZone']
-			instance.state = inst['State']['Name']
-			instance.ip = inst['VerifiedIp']
-			instances.append(instance)
-
-	return instances
-
 #
 # Request EC2 SSH Key Pairs from AWS API
 def getEc2KeyPairs(ec2):
@@ -183,57 +152,6 @@ def getEc2SecurityGroups(ec2, securityGroupId):
 		return groups
 	else:
 		return groups[0]
-# Get a list of volumes or a single volumes and return an Ec2Volume object
-#  or array of Ec2Volume objects
-def getEc2Volumes(ec2, volumeId):
-	try:
-		if volumeId == "all":
-			volumes = ec2.describe_volumes()
-		else:
-			volumes = ec2.describe_volumes(VolumeIds=[volumeId])
-	except Exception as e:
-		sys.exit("Volumes query failure: " + str(e[0]))
-
-	returnedVolumes = []
-	# Always an array, even of 1. Iterate through any volumes returned.
-	for volume in volumes['Volumes']:
-		returnedVolume = arsedefs.Ec2Volume(volume['VolumeId'])
-
-		# Get the value of the name tag. Don't die in a fire if there isn't one. 
-		tagName = ''
-		if 'Tags' in volume:
-			for tag in volume['Tags']:
-				if tag['Key'] == "Name":
-					tagName = tag['Value']
-
-		returnedVolume.availabilityZone = volume['AvailabilityZone']
-
-		# If a volume is not attached to an instance, the array of attachments will exist
-		#	but will be of course length of 0
-		if len(volume['Attachments']) > 0:
-			returnedVolume.attached['attachDevice'] = volume['Attachments'][0]['Device']
-			returnedVolume.attached['attachInstanceId'] = volume['Attachments'][0]['InstanceId']
-			returnedVolume.attached['attachTime'] = volume['Attachments'][0]['AttachTime']
-			#
-			# So, in order to make this work we're going to have to probably make an array of all instance IDs
-			#   then ec2.describe_instances(instanceIDs=[thatarray]). Iterate over that and put the hostname
-			#   tags in the volume objects. Otherwise it's going to be N + a few API calls where N is the number of volumes. 
-			returnedVolume.attached['attachHostname'] = returnedVolume.attached['attachInstanceId']
-		else:
-			returnedVolume.attached['attachInstanceId'] = ' detached '
-			returnedVolume.attached['attachHostname'] = ' detached '
-
-		returnedVolume.size = volume['Size']
-		returnedVolume.state = volume['State']
-		returnedVolume.tagName = tagName
-
-		returnedVolumes.append(returnedVolume)
-
-	# If we asked for all, return an array of Ec2Volumes or just one
-	if volumeId == "all":
-		return returnedVolumes
-	else:
-		return returnedVolumes[0]
 #
 #
 def displayEc2Elbs(ec2, lbName):
@@ -264,16 +182,6 @@ def displayEc2Images(ec2):
 		image.printShort()
 #
 #
-def displayEc2Instances(ec2):
-	try:
-		instances = getEc2Instances(ec2)
-	except Exception as e:
-		sys.exit("getInstances query failure: " + str(e[0]))
-
-	for instance in instances:
-		instance.printLong()
-#
-#
 def displayEc2KeyPairs(ec2):
 	try:
 		keyPairs = getEc2KeyPairs(ec2)
@@ -302,24 +210,7 @@ def displayEc2SecurityGroups(ec2, securityGroupId):
 	else:
 		groups.printLong()
 #
-# 
-def displayEc2Volumes(ec2, volumeId):
-	try:
-		volumes = getEc2Volumes(ec2, volumeId)
-	except Exception as e:
-		sys.exit("getVolumes query failure: " + str(e[0]))
-
-	if isinstance(volumes, collections.Sequence):
-		print " ID:           Attached:                GB:  Device:    Status:   Zone:       Name:"
-		print "===================================================================================================="
-		#print ("-[{0}]----------[{1}]--------------[{2}]--[{3}]--[{4}]---[{5}]-----[{6}]----------------------".format(
-		#	"ID", "Attached", "GB", "Device", "Status", "Zone", "Name"))
-
-		for volume in volumes:
-			volume.printShort()
-	else:
-	 	volumes.printLong()
-
+#		
 def main():
 	# Let's be sure we get a command line option
 	clOption = ''
@@ -328,41 +219,47 @@ def main():
 	else:
 		clOption = sys.argv[1]
 
-		# Parse said command line option
-		if clOption == "" or re.search('^(-)?(-)?h(elp)?', clOption):
-			arsedefs.printHelp()
-		else: 
-			# Initialize the AWS client object
-			if re.search('^elb', clOption):
-				ec2 = boto3.client('elb', region_name='us-east-1')
-			else:
-				ec2 = boto3.client('ec2', region_name='us-east-1')
+		# Load JSON config file
+		try:
+			with open('arse.conf.json') as arseConfigJson:
+				arseConfig = json.load(arseConfigJson)
+		except Exception as e:
+			sys.exit("Unable to open json config file: " + str(e))
 
-			# We don't need no stinkin argparse
-			#
-			# Elastic Loadbalancers
-			if clOption == "elb":
-				displayEc2Elbs(ec2, '')
-			elif re.search('^elb\-', clOption):
-				displayEc2Elbs(ec2, clOption.lstrip('elb-'))
-			#
-			elif clOption == "images":
-				displayEc2Images(ec2)
-			elif clOption == "instances":
-				displayEc2Instances(ec2) 
-			elif clOption == "keys":
-				displayEc2KeyPairs(ec2)
-			elif clOption == "security":
-				displayEc2SecurityGroups(ec2, 'all')
-			elif re.search('^sg\-', clOption):
-				displayEc2SecurityGroups(ec2, clOption)				
-			elif clOption == "volumes":
-				displayEc2Volumes(ec2, 'all')
-			elif re.search('^vol\-', clOption):
-				displayEc2Volumes(ec2, clOption)
-			else:
-				print "Error: invalid option."
-				arsedefs.printHelp()
+		#
+		# Loop through aws accounts - specify something on the cli later
+		resources = []
+		sys.stdout.write("*Searching AWS Accounts: ")
+		sys.stdout.flush()
+		for awsAccount in arseConfig['configurations']:
+			sys.stdout.write(awsAccount['account'] + ' ')
+			sys.stdout.flush()
+			session = boto3.session.Session(profile_name=awsAccount['account'])
+
+			# Loop through regions - specify something on the cli later
+			awsRegions = awsAccount['regions']
+			for awsRegion in awsRegions:
+				# Instances	
+				if clOption == "instances":
+					try:
+						instances = arsedefs.getEc2Instances(awsAccount, awsRegion, session, '')
+					except Exception as e:
+						sys.exit("getInstances query failure: " + str(e[0]))
+
+					resources.append(instances)
+				elif clOption == "volumes":
+				 	try:
+				 		volumes = arsedefs.getEc2Volumes(awsAccount, awsRegion, session, '')
+				 	except Exception as e:
+						sys.exit("getVolumes query failure: " + str(e[0]))
+		#
+		# Display the data we've received
+		print ""
+		arsedefs.printHeader(clOption)
+		
+		for resourceArray in resources:
+			for resource in resourceArray:
+				resource.printShort()
 
 	print ""
 #

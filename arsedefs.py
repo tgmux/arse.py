@@ -1,4 +1,5 @@
 from colorama import Fore, Back, Style, init
+import sys
 
 class Ec2Elb:
 	'Common base class for EC2 Elastic Loadbalancers'
@@ -71,6 +72,7 @@ class Ec2Instance:
 	'Common base class for EC2 Instances'
 
 	def __init__(self, instanceId):
+		self.account = ''
 		self.instanceId = instanceId
 		self.name = ''
 		self.itype = ''
@@ -81,15 +83,24 @@ class Ec2Instance:
 		self.reason = ''
 		self.launchtime = ''
 
-	def printLong(self):
-		print(" {name:<31s} {id:<12s} {itype:<10s} [{vtype:<4s}]  {zone}  {state:<20}  {ip}".format(
-				name=self.name[:30],
-				id=self.instanceId,
-				itype=self.itype,
-				vtype=self.vtype[:4],
-				zone=self.zone,
-				state=self.state,
-				ip=self.ip))
+	def printShort(self):
+		# Colors are the new white text
+		if self.state == "running":
+			self.state = Fore.GREEN + self.state + Fore.RESET
+		elif self.state == "stopped":
+			self.state = Fore.RED + self.state + Fore.RESET
+		else: 
+			self.state = Fore.YELLOW + self.state + Fore.RESET
+
+		print(" {account:<9s} {name:<31s}  {id:<20s}  {itype:<10s}  {vtype:<6s}  {zone:<15s}  {state:<8}  {ip}".format(
+			account=self.account,
+			name=self.name[:30],
+			id=self.instanceId,
+			itype=self.itype,
+			vtype=self.vtype[:4],
+			zone=self.zone,
+			state=self.state,
+			ip=self.ip))
 
 class Ec2KeyPair:
 	'Common base class for EC2 key pairs'
@@ -146,6 +157,7 @@ class Ec2Volume:
 	'Class to describe EC2 EBS Volumes'
 
 	def __init__(self, volumeId):
+		self.account = ''
 		self.attached = {
 			'attachDevice': '',
 			'attachHostname': '',
@@ -187,20 +199,118 @@ class Ec2Volume:
 				state=self.state,
 				size=self.size,
 				tagname=self.tagName)
+#
+#
+# def displayEc2Instances(awsAccount, ec2, awsRegions):
+# 	printEc2InstancesHeader()
+# 	for awsRegion in awsRegions:
+# 		for instance in instances:
+# 			instance.printShort()
+#
+#
+def getEc2Instances(awsAccount, awsRegion, session, instanceId):
+	ec2 = session.client('ec2', region_name=awsRegion)
 
+	if instanceId == "":
+		try:
+			reservations = ec2.describe_instances()
+		except Exception as e:
+			sys.exit("Instance reservation query failure: " + str(e[0]))
+
+	instances = []
+	for reservation in reservations['Reservations']:
+		for inst in reservation['Instances']:
+			instance = Ec2Instance(inst['InstanceId'])
+			for tag in inst['Tags']:
+				if tag['Key'] == 'Name':
+					inst['NameFromTag'] = tag['Value']
+
+			if 'PrivateIpAddress' in inst:
+				inst['VerifiedIp'] = inst['PrivateIpAddress']
+			else:
+				inst['VerifiedIp'] = 'n/a'
+
+			instance.account = awsAccount['account']
+			instance.name = inst['NameFromTag']
+			instance.itype = inst['InstanceType']
+			instance.vtype = inst['VirtualizationType']
+			instance.zone = inst['Placement']['AvailabilityZone']
+			instance.state = inst['State']['Name']
+			instance.ip = inst['VerifiedIp']
+			instances.append(instance)
+
+	ec2 = None
+	return instances
+# Get a list of volumes or a single volumes and return an Ec2Volume object
+#  or array of Ec2Volume objects
+def getEc2Volumes(awsAccount, awsRegion, session, volumeId):
+	ec2 = session.client('ec2', region_name=awsRegion)
+	try:
+		if volumeId == '':
+			volumes = ec2.describe_volumes()
+		else:
+			volumes = ec2.describe_volumes(VolumeIds=[volumeId])
+	except Exception as e:
+		sys.exit("Volumes query failure: " + str(e[0]))
+
+	returnedVolumes = []
+	# Always an array, even of 1. Iterate through any volumes returned.
+	for volume in volumes['Volumes']:
+		returnedVolume = Ec2Volume(volume['VolumeId'])
+
+		# Get the value of the name tag. Don't die in a fire if there isn't one. 
+		tagName = ''
+		if 'Tags' in volume:
+			for tag in volume['Tags']:
+				if tag['Key'] == "Name":
+					tagName = tag['Value']
+
+		returnedVolume.availabilityZone = volume['AvailabilityZone']
+
+		# If a volume is not attached to an instance, the array of attachments will exist
+		#	but will be of course length of 0
+		if len(volume['Attachments']) > 0:
+			returnedVolume.attached['attachDevice'] = volume['Attachments'][0]['Device']
+			returnedVolume.attached['attachInstanceId'] = volume['Attachments'][0]['InstanceId']
+			returnedVolume.attached['attachTime'] = volume['Attachments'][0]['AttachTime']
+			#
+			# So, in order to make this work we're going to have to probably make an array of all instance IDs
+			#   then ec2.describe_instances(instanceIDs=[thatarray]). Iterate over that and put the hostname
+			#   tags in the volume objects. Otherwise it's going to be N + a few API calls where N is the number of volumes. 
+			returnedVolume.attached['attachHostname'] = returnedVolume.attached['attachInstanceId']
+		else:
+			returnedVolume.attached['attachInstanceId'] = ' detached '
+			returnedVolume.attached['attachHostname'] = ' detached '
+
+		returnedVolume.size = volume['Size']
+		returnedVolume.state = volume['State']
+		returnedVolume.tagName = tagName
+
+		returnedVolumes.append(returnedVolume)
+
+	return returnedVolumes
+#
+#
+def printHeader(headerStyle):
+	if headerStyle == "instances":
+		print("{0:<10s} {1:<32s} {2:<21s} {3:<11s} {4:<5s}  {5:<16s} {6:<7s}  {7}".format(
+	 		"Acct:", "Name:", "ID:", "iType:", "vType:", "Zone:", "State:", "IP:"))
+	 	print "============================================================================================================================="
+#
+#
 def printHelp():
 	print "\narse :: Amazon ReSource Explorer"
 	print "-------------------------------------------------------"
-	print "  elb            - EC2 Elastic Loadbalancer List"
-	print "  elb-<name>     - Verbose EC2 ELB Display"
-	print "  images         - EC2 AMI List"
-	print "  *ami-xxxxxxxx  - Verbose EC2 AMI Display"
+	print "  *elb           - EC2 Elastic Loadbalancer List"
+	print "  *elb-<name>    - Verbose EC2 ELB Display"
+	print "  *images        - EC2 AMI List"
+	print "  **ami-xxxxxxxx - Verbose EC2 AMI Display"
 	print "  instances      - EC2 Instance List"
-	print "  *i-xxxxxxxx    - Verbose EC2 Instance Display"
-	print "  keys           - EC2 SSH Keys"
-	print "  security       - EC2 Security Groups"
-	print "  sg-xxxxxxxx    - Verbose EC2 Security Group Display"
+	print "  **i-xxxxxxxx   - Verbose EC2 Instance Display"
+	print "  *keys          - EC2 SSH Keys"
+	print "  *security      - EC2 Security Groups"
+	print "  *sg-xxxxxxxx   - Verbose EC2 Security Group Display"
 	print "  volumes        - EBS Volumes"
-	print "  *vol-xxxxxxxx  - Verbose EBS Volume Display"
+	print "  **vol-xxxxxxxx - Verbose EBS Volume Display"
 	print "-------------------------------------------------------"
 	print "ex: arse [command]"
