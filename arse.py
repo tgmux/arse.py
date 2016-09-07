@@ -6,52 +6,6 @@ from colorama import Fore, Back, Style, init
 import json
 import re
 import sys
-#
-# Request EC2 Elastic Loadbalancers from AWS API
-def getEc2Elbs(ec2, elbName):
-	try:
-		if elbName == '':
-			loadBalancers = ec2.describe_load_balancers()
-		else:
-			loadBalancers = ec2.describe_load_balancers(LoadBalancerNames=[elbName])
-	except Exception as e:
-		sys.exit("Elastic Load Balancer query failure: " + str(e[0]))
-
-	# Iterate through the returned loadbalancers
-	elbs = []
-	for lb in loadBalancers['LoadBalancerDescriptions']:
-		elb = arsedefs.Ec2Elb(lb['LoadBalancerName'])
-		elb.availabilityZones = lb['AvailabilityZones']
-		elb.created = lb['CreatedTime']
-		elb.dnsName = lb['DNSName']
-		elb.policies = lb['Policies']
-		elb.securityGroups = lb['SecurityGroups']
-		elb.subnets = lb['Subnets']
-		elb.vpcId = lb['VPCId']
-
-		# Loop over instances to which ELB is attached
-		instances = []
-		for instance in lb['Instances']:
-			instances.append(instance['InstanceId'])
-		elb.instances = instances
-
-		elbListeners = []
-		# Iterate & display through each listener of the ELB in question
-		for listener in lb['ListenerDescriptions']:
-			elbListener = arsedefs.Ec2ElbListener()
-			elbListener.lbPort = listener['Listener']['LoadBalancerPort']
-			elbListener.lbProtocol = listener['Listener']['Protocol']
-			elbListener.instancePort = listener['Listener']['InstancePort']
-			elbListener.instanceProtocol = listener['Listener']['InstanceProtocol']
-			elbListeners.append(elbListener)
-			
-		elb.listeners = elbListeners
-		elbs.append(elb)
-
-	#if elbName == '':
-	return elbs
-	# else:
-	# 	return elbs[0]
 
 #
 # Display all EC2 AMIs
@@ -138,22 +92,6 @@ def getEc2SecurityGroups(ec2, securityGroupId):
 		return groups[0]
 #
 #
-def displayEc2Elbs(ec2, lbName):
-	try:
-		elbs = getEc2Elbs(ec2, lbName)
-	except Exception as e:
-		sys.exit("getEc2Elbs query failure: " + str(e[0]))
-
-	print("{0:<13} {1:<16} {2:<29} {3}".format('VPC ID:', 'ELB Name:', 'Zones:', 'Public DNS Name:'))
-	print("===================================================================================================")
-
-	for elb in elbs:
-		elb.printShort()
-
-		if lbName != '':
-			elb.printLong()
-#
-#
 def displayEc2Images(ec2):
 	try:
 		images = getEc2Images(ec2)
@@ -200,7 +138,7 @@ def main():
 		#
 		# Loop through aws accounts - specify something on the cli later
 		resources = []
-		sys.stdout.write(" Searching AWS Accounts: ")
+		sys.stdout.write("* Searching AWS Accounts: ")
 		sys.stdout.flush()
 		for awsAccount in arseConfig['configurations']:
 			awsAccountName = awsAccount['account']
@@ -211,8 +149,16 @@ def main():
 			# Loop through regions - specify something on the cli later
 			awsRegions = awsAccount['regions']
 			for awsRegion in awsRegions:
-				# Instances	
-				if clOption == "instances":
+				# elastic load balancers	
+				if clOption == "elbs":
+					try:
+						elbs = arsedefs.getEc2Elbs(awsAccountName, awsRegion, session, '')
+					except Exception as e:
+						sys.exit("getElbs query failure: " + str(e[0]))
+
+					resources.append(elbs)
+				# instances	
+				elif clOption == "instances":
 					try:
 						instances = arsedefs.getEc2Instances(awsAccountName, awsRegion, session, '')
 					except Exception as e:

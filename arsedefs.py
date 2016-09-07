@@ -6,6 +6,7 @@ class Ec2Elb:
 
 	def __init__(self, elbName):
 		self.availabilityZones = []
+		self.awsAccountName = ''
 		self.created = ''
 		self.elbName = elbName
 		self.dnsName = ''
@@ -18,9 +19,10 @@ class Ec2Elb:
 		self.vpcId = ''
 
 	def printShort(self):
-		print ("{vpcid:<13} {lbname:<24} {zones:<29} {dnsname}".format(
+		print (" {account:<9s} {vpcid:<13} {lbname:<32} {zones:<40} {dnsname}".format(
+			account=self.awsAccountName,
 			lbname=Style.BRIGHT + self.elbName + Style.RESET_ALL,
-			dnsname=self.dnsName,
+			dnsname=self.dnsName[:-14],
 			vpcid=self.vpcId,
 			zones=str(self.availabilityZones)))
 
@@ -203,6 +205,52 @@ class Ec2Volume:
 				size=self.size,
 				tagname=self.tagName)
 #
+# Request EC2 Elastic Loadbalancers from AWS API
+def getEc2Elbs(awsAccountName, awsRegion, session, elbName):
+	ec2 = session.client('elb', region_name=awsRegion)
+
+	try:
+		if elbName == '':
+			loadBalancers = ec2.describe_load_balancers()
+		else:
+			loadBalancers = ec2.describe_load_balancers(LoadBalancerNames=[elbName])
+	except Exception as e:
+		sys.exit("Elastic Load Balancer query failure: " + str(e[0]))
+
+	# Iterate through the returned loadbalancers
+	elbs = []
+	for lb in loadBalancers['LoadBalancerDescriptions']:
+		elb = Ec2Elb(lb['LoadBalancerName'])
+		elb.availabilityZones = lb['AvailabilityZones']
+		elb.awsAccountName = awsAccountName
+		elb.created = lb['CreatedTime']
+		elb.dnsName = lb['DNSName']
+		elb.policies = lb['Policies']
+		elb.securityGroups = lb['SecurityGroups']
+		elb.subnets = lb['Subnets']
+		elb.vpcId = lb['VPCId']
+
+		# Loop over instances to which ELB is attached
+		instances = []
+		for instance in lb['Instances']:
+			instances.append(instance['InstanceId'])
+		elb.instances = instances
+
+		elbListeners = []
+		# Iterate & display through each listener of the ELB in question
+		for listener in lb['ListenerDescriptions']:
+			elbListener = Ec2ElbListener()
+			elbListener.lbPort = listener['Listener']['LoadBalancerPort']
+			elbListener.lbProtocol = listener['Listener']['Protocol']
+			elbListener.instancePort = listener['Listener']['InstancePort']
+			elbListener.instanceProtocol = listener['Listener']['InstanceProtocol']
+			elbListeners.append(elbListener)
+			
+		elb.listeners = elbListeners
+		elbs.append(elb)
+
+	return elbs
+#
 #
 def getEc2Instances(awsAccountName, awsRegion, session, instanceId):
 	ec2 = session.client('ec2', region_name=awsRegion)
@@ -237,8 +285,6 @@ def getEc2Instances(awsAccountName, awsRegion, session, instanceId):
 
 	ec2 = None
 	return instances
-#
-#
 #
 # Request EC2 SSH Key Pairs from AWS API
 def getEc2KeyPairs(awsAccountName, awsRegion, session):
@@ -310,7 +356,11 @@ def getEc2Volumes(awsAccountName, awsRegion, session, volumeId):
 #
 #
 def printHeader(headerStyle):
-	if headerStyle == "instances":
+	if headerStyle == "elbs":
+		print("{0:<10s} {1:<13} {2:<24} {3:<40} {4}".format(
+			"Acct:", "VPC ID:", "ELB Name:", "Zones:", "Public DNS Name:"))
+		print "============================================================================================================================="
+	elif headerStyle == "instances":
 		print("{0:<10s} {1:<32s} {2:<21s} {3:<11s} {4:<5s}  {5:<16s} {6:<7s}  {7}".format(
 	 		"Acct:", "Name:", "ID:", "iType:", "vType:", "Zone:", "State:", "IP:"))
 	 	print "============================================================================================================================="
@@ -327,9 +377,9 @@ def printHeader(headerStyle):
 def printHelp():
 	print "\narse :: Amazon ReSource Explorer"
 	print "-------------------------------------------------------"
-	print "  *elb           - EC2 Elastic Loadbalancer List"
+	print "  elb            - EC2 Elastic Loadbalancer List"
 	print "  *elb-<name>    - Verbose EC2 ELB Display"
-	print "  *images        - EC2 AMI List"
+	print "  images         - EC2 AMI List"
 	print "  **ami-xxxxxxxx - Verbose EC2 AMI Display"
 	print "  instances      - EC2 Instance List"
 	print "  **i-xxxxxxxx   - Verbose EC2 Instance Display"
