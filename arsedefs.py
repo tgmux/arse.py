@@ -56,10 +56,10 @@ class Ec2Image:
 	'Common base class for EC2 AMIs'
 
 	def __init__(self):
+		self.created = ''
 		self.imageId = ''
 		self.name = ''
 		self.virtualizationType = ''
-		self.created = ''
 
 	def printShort(self):
 		print("{id:<14s} {name:<70s} {vtype:<7s} {date:<30s}".format(
@@ -74,14 +74,14 @@ class Ec2Instance:
 	def __init__(self, instanceId):
 		self.awsAccountName = ''
 		self.instanceId = instanceId
-		self.name = ''
+		self.ip = ''
 		self.itype = ''
+		self.launchtime = ''
+		self.name = ''
+		self.reason = ''
+		self.state = ''
 		self.vtype = ''
 		self.zone = ''
-		self.state = ''
-		self.ip = ''
-		self.reason = ''
-		self.launchtime = ''
 
 	def printShort(self):
 		# Colors are the new white text
@@ -120,10 +120,10 @@ class Ec2SecurityGroup:
 	'Common base class for EC2 Security Groups'
 
 	def __init__(self, securityGroupId):
-		self.securityGroupId = securityGroupId
-		self.name = ''
 		self.description = ''
+		self.name = ''
 		self.permissions = []
+		self.securityGroupId = securityGroupId
 
 	def printShort(self):
 		print(" {id:<12s} {name:<24s} {description}").format(
@@ -149,11 +149,11 @@ class Ec2SecurityGroupPermission:
 	'EC2 Security Group Permission Data Structure'
 
 	def __init__(self):
-		self.type = ''
 		self.fromPort = ''
-		self.toPort = ''
 		self.protocol = ''
 		self.ranges = []
+		self.toPort = ''
+		self.type = ''
 
 class Ec2Volume:
 	'Class to describe EC2 EBS Volumes'
@@ -314,13 +314,13 @@ def printHeader(headerStyle):
 		print("{0:<10s} {1:<32s} {2:<21s} {3:<11s} {4:<5s}  {5:<16s} {6:<7s}  {7}".format(
 	 		"Acct:", "Name:", "ID:", "iType:", "vType:", "Zone:", "State:", "IP:"))
 	 	print "============================================================================================================================="
-	elif headerStyle == "volumes":
-		print ("{0:<10s} {1:<23} {2:<41} {3:<5} {4:<10} {5:<9} {6:<17} {7}".format(
-			"Acct:", "ID:", "Attached:", "GB:", "Device:", "Status:", "Zone:", "Name:"))
-		print "============================================================================================================================="
 	elif headerStyle == "keys":
 		print("{0:<10s} {1:<24s} {2}".format(
 			"Acct:", "Name:", "Fingerprint:"))
+		print "============================================================================================================================="
+	elif headerStyle == "volumes":
+		print ("{0:<10s} {1:<23} {2:<41} {3:<5} {4:<10} {5:<9} {6:<17} {7}".format(
+			"Acct:", "ID:", "Attached:", "GB:", "Device:", "Status:", "Zone:", "Name:"))
 		print "============================================================================================================================="
 #
 #

@@ -219,14 +219,6 @@ def main():
 						sys.exit("getInstances query failure: " + str(e[0]))
 
 					resources.append(instances)
-				# ebs volumes
-				elif clOption == "volumes":
-				 	try:
-				 		volumes = arsedefs.getEc2Volumes(awsAccountName, awsRegion, session, '')
-				 	except Exception as e:
-						sys.exit("getVolumes query failure: " + str(e[0]))
-
-					resources.append(volumes)
 				# ssh keys
 				elif clOption == "keys":
 					try:
@@ -235,6 +227,14 @@ def main():
 						sys.exit("getKeyPairs query failure: " + str(e[0]))
 
 					resources.append(keys)
+				# ebs volumes
+				elif clOption == "volumes":
+				 	try:
+				 		volumes = arsedefs.getEc2Volumes(awsAccountName, awsRegion, session, '')
+				 	except Exception as e:
+						sys.exit("getVolumes query failure: " + str(e[0]))
+
+					resources.append(volumes)
 		#
 		# Display the data we've received
 		print ""
