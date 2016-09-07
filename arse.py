@@ -8,24 +8,6 @@ import re
 import sys
 
 #
-# Display all EC2 AMIs
-def getEc2Images(ec2):
-	try:
-		diskImages = ec2.describe_images(Owners=['self'])
-	except Exception as e:
-		sys.exit("Images query failure: " + str(e[0]))
-
-	images = []
-	for ami in diskImages['Images']:
-		image = arsedefs.Ec2Image()
-		image.imageId = ami['ImageId']
-		image.name = ami['Name']
-		image.virtualizationType = ami['VirtualizationType']
-		image.created = ami['CreationDate']
-		images.append(image)
-
-	return images
-#
 # Request EC2 security groups from AWS API
 def getEc2SecurityGroups(ec2, securityGroupId):
 	try:
@@ -92,18 +74,6 @@ def getEc2SecurityGroups(ec2, securityGroupId):
 		return groups[0]
 #
 #
-def displayEc2Images(ec2):
-	try:
-		images = getEc2Images(ec2)
-	except Exception as e:
-		sys.exit("getEc2Images query failure: " + str(e[0]))
-
-	print("{0:<14s} {1:<70s} {2:<7s} {3:<30s}".format("ID:", "Name:", "vType:", "Creation Date:"))
-	print "======================================================================================================================"
-	for image in images:
-		image.printShort()
-#
-#
 def displayEc2SecurityGroups(ec2, securityGroupId):
 	try:
 		groups = getEc2SecurityGroups(ec2, securityGroupId)
@@ -157,6 +127,13 @@ def main():
 						sys.exit("getElbs query failure: " + str(e[0]))
 
 					resources.append(elbs)
+				elif clOption == "images":
+					try:
+						images = arsedefs.getEc2Images(awsAccountName, awsRegion, session)
+					except Exception as e:
+						sys.exit("getImages query failure: " + str(e[0]))
+
+					resources.append(images)
 				# instances	
 				elif clOption == "instances":
 					try:

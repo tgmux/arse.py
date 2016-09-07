@@ -58,13 +58,15 @@ class Ec2Image:
 	'Common base class for EC2 AMIs'
 
 	def __init__(self):
+		self.awsAccountName = ''
 		self.created = ''
 		self.imageId = ''
 		self.name = ''
 		self.virtualizationType = ''
 
 	def printShort(self):
-		print("{id:<14s} {name:<70s} {vtype:<7s} {date:<30s}".format(
+		print(" {account:<9s} {id:<14s} {name:<70s} {vtype:<7s} {date:<30s}".format(
+			account=self.awsAccountName,
 			id=self.imageId,
 			name=self.name,
 			vtype=self.virtualizationType[:5],
@@ -251,6 +253,27 @@ def getEc2Elbs(awsAccountName, awsRegion, session, elbName):
 
 	return elbs
 #
+# Display all EC2 AMIs
+def getEc2Images(awsAccountName, awsRegion, session):
+	ec2 = session.client('ec2', region_name=awsRegion)
+
+	try:
+		diskImages = ec2.describe_images(Owners=['self'])
+	except Exception as e:
+		sys.exit("Images query failure: " + str(e[0]))
+
+	images = []
+	for ami in diskImages['Images']:
+		image = Ec2Image()
+		image.awsAccountName = awsAccountName
+		image.created = ami['CreationDate']
+		image.imageId = ami['ImageId']
+		image.name = ami['Name']
+		image.virtualizationType = ami['VirtualizationType']
+		images.append(image)
+
+	return images
+#
 #
 def getEc2Instances(awsAccountName, awsRegion, session, instanceId):
 	ec2 = session.client('ec2', region_name=awsRegion)
@@ -359,6 +382,10 @@ def printHeader(headerStyle):
 	if headerStyle == "elbs":
 		print("{0:<10s} {1:<13} {2:<24} {3:<40} {4}".format(
 			"Acct:", "VPC ID:", "ELB Name:", "Zones:", "Public DNS Name:"))
+		print "============================================================================================================================="
+	elif headerStyle == "images":
+		print("{0:<10s} {1:<14s} {2:<70s} {3:<7s} {4:<30s}".format(
+			"Acct:", "ID:", "Name:", "vType:", "Creation Date:"))
 		print "============================================================================================================================="
 	elif headerStyle == "instances":
 		print("{0:<10s} {1:<32s} {2:<21s} {3:<11s} {4:<5s}  {5:<16s} {6:<7s}  {7}".format(
