@@ -72,22 +72,6 @@ def getEc2Images(ec2):
 
 	return images
 #
-# Request EC2 SSH Key Pairs from AWS API
-def getEc2KeyPairs(ec2):
-	try:
-		pairs = ec2.describe_key_pairs()
-	except Exception as e:
-		sys.exit("Key pair query failure: " + str(e[0]))
-
-	keyPairs = []
-	for key in pairs['KeyPairs']:
-		keyPair = arsedefs.Ec2KeyPair()
-		keyPair.name = key['KeyName']
-		keyPair.fingerprint = key['KeyFingerprint']
-		keyPairs.append(keyPair)
-
-	return keyPairs
-#
 # Request EC2 security groups from AWS API
 def getEc2SecurityGroups(ec2, securityGroupId):
 	try:
@@ -182,19 +166,6 @@ def displayEc2Images(ec2):
 		image.printShort()
 #
 #
-def displayEc2KeyPairs(ec2):
-	try:
-		keyPairs = getEc2KeyPairs(ec2)
-	except Exception as e:
-		sys.exit("getKeyPairs query failure: " + str(e[0]))
-
-	print("{0:<12s} {1}".format("Name:", "Fingerprint:"))
-	print "========================================================================"
-
-	for keyPair in keyPairs:
-		keyPair.printLong()
-#
-#
 def displayEc2SecurityGroups(ec2, securityGroupId):
 	try:
 		groups = getEc2SecurityGroups(ec2, securityGroupId)
@@ -232,9 +203,10 @@ def main():
 		sys.stdout.write(" Searching AWS Accounts: ")
 		sys.stdout.flush()
 		for awsAccount in arseConfig['configurations']:
-			sys.stdout.write(awsAccount['account'] + ' ')
+			awsAccountName = awsAccount['account']
+			sys.stdout.write(awsAccountName + ' ')
 			sys.stdout.flush()
-			session = boto3.session.Session(profile_name=awsAccount['account'])
+			session = boto3.session.Session(profile_name=awsAccountName)
 
 			# Loop through regions - specify something on the cli later
 			awsRegions = awsAccount['regions']
@@ -242,17 +214,27 @@ def main():
 				# Instances	
 				if clOption == "instances":
 					try:
-						instances = arsedefs.getEc2Instances(awsAccount, awsRegion, session, '')
+						instances = arsedefs.getEc2Instances(awsAccountName, awsRegion, session, '')
 					except Exception as e:
 						sys.exit("getInstances query failure: " + str(e[0]))
 
 					resources.append(instances)
+				# ebs volumes
 				elif clOption == "volumes":
 				 	try:
-				 		volumes = arsedefs.getEc2Volumes(awsAccount, awsRegion, session, '')
+				 		volumes = arsedefs.getEc2Volumes(awsAccountName, awsRegion, session, '')
 				 	except Exception as e:
 						sys.exit("getVolumes query failure: " + str(e[0]))
+
 					resources.append(volumes)
+				# ssh keys
+				elif clOption == "keys":
+					try:
+						keys = arsedefs.getEc2KeyPairs(awsAccountName, awsRegion, session)
+					except Exception as e:
+						sys.exit("getKeyPairs query failure: " + str(e[0]))
+
+					resources.append(keys)
 		#
 		# Display the data we've received
 		print ""

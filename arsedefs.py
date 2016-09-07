@@ -72,7 +72,7 @@ class Ec2Instance:
 	'Common base class for EC2 Instances'
 
 	def __init__(self, instanceId):
-		self.account = ''
+		self.awsAccountName = ''
 		self.instanceId = instanceId
 		self.name = ''
 		self.itype = ''
@@ -93,7 +93,7 @@ class Ec2Instance:
 			self.state = Fore.YELLOW + self.state + Fore.RESET
 
 		print(" {account:<9s} {name:<31s}  {id:<20s}  {itype:<10s}  {vtype:<6s}  {zone:<15s}  {state:<8}  {ip}".format(
-			account=self.account,
+			account=self.awsAccountName,
 			name=self.name[:30],
 			id=self.instanceId,
 			itype=self.itype,
@@ -106,11 +106,13 @@ class Ec2KeyPair:
 	'Common base class for EC2 key pairs'
 
 	def __init__(self):
-		self.name = ''
+		self.awsAccountName = ''
 		self.fingerprint = ''
+		self.name = ''
 
-	def printLong(self):
-		print("{name:<12s} {fingerprint}".format(
+	def printShort(self):
+		print(" {account: <9s} {name:<24s} {fingerprint}".format(
+			account=self.awsAccountName,
 			name=self.name,
 			fingerprint=self.fingerprint))
 
@@ -157,7 +159,7 @@ class Ec2Volume:
 	'Class to describe EC2 EBS Volumes'
 
 	def __init__(self, volumeId):
-		self.awsAccount = ''
+		self.awsAccountName = ''
 		self.attached = {
 			'attachDevice': '',
 			'attachHostname': '',
@@ -184,7 +186,7 @@ class Ec2Volume:
 		self.combinedInstanceName = (self.attached['attachInstanceId'] +
 			" (" + str(self.attached['attachHostname']) + ")")
 		print (" {account:<9s} {volumeId:<22}  {instance:<41} {size:<5} {device:<10} {state:<19} {zone:<16}  {tagname}".format(
-				account=self.awsAccount,
+				account=self.awsAccountName,
 				zone=self.availabilityZone,
 				volumeId=self.volumeId,
 				instance=self.combinedInstanceName,
@@ -202,14 +204,7 @@ class Ec2Volume:
 				tagname=self.tagName)
 #
 #
-# def displayEc2Instances(awsAccount, ec2, awsRegions):
-# 	printEc2InstancesHeader()
-# 	for awsRegion in awsRegions:
-# 		for instance in instances:
-# 			instance.printShort()
-#
-#
-def getEc2Instances(awsAccount, awsRegion, session, instanceId):
+def getEc2Instances(awsAccountName, awsRegion, session, instanceId):
 	ec2 = session.client('ec2', region_name=awsRegion)
 
 	if instanceId == "":
@@ -231,7 +226,7 @@ def getEc2Instances(awsAccount, awsRegion, session, instanceId):
 			else:
 				inst['VerifiedIp'] = 'n/a'
 
-			instance.account = awsAccount['account']
+			instance.awsAccountName = awsAccountName
 			instance.name = inst['NameFromTag']
 			instance.itype = inst['InstanceType']
 			instance.vtype = inst['VirtualizationType']
@@ -242,9 +237,30 @@ def getEc2Instances(awsAccount, awsRegion, session, instanceId):
 
 	ec2 = None
 	return instances
+#
+#
+#
+# Request EC2 SSH Key Pairs from AWS API
+def getEc2KeyPairs(awsAccountName, awsRegion, session):
+	ec2 = session.client('ec2', region_name=awsRegion)
+
+	try:
+		pairs = ec2.describe_key_pairs()
+	except Exception as e:
+		sys.exit("Key pair query failure: " + str(e[0]))
+
+	keyPairs = []
+	for key in pairs['KeyPairs']:
+		keyPair = Ec2KeyPair()
+		keyPair.awsAccountName = awsAccountName
+		keyPair.name = key['KeyName']
+		keyPair.fingerprint = key['KeyFingerprint']
+		keyPairs.append(keyPair)
+
+	return keyPairs
 # Get a list of volumes or a single volumes and return an Ec2Volume object
 #  or array of Ec2Volume objects
-def getEc2Volumes(awsAccount, awsRegion, session, volumeId):
+def getEc2Volumes(awsAccountName, awsRegion, session, volumeId):
 	ec2 = session.client('ec2', region_name=awsRegion)
 	try:
 		if volumeId == '':
@@ -286,7 +302,7 @@ def getEc2Volumes(awsAccount, awsRegion, session, volumeId):
 		returnedVolume.size = volume['Size']
 		returnedVolume.state = volume['State']
 		returnedVolume.tagName = tagName
-		returnedVolume.awsAccount = awsAccount['account']
+		returnedVolume.awsAccountName = awsAccountName
 
 		returnedVolumes.append(returnedVolume)
 
@@ -301,7 +317,11 @@ def printHeader(headerStyle):
 	elif headerStyle == "volumes":
 		print ("{0:<10s} {1:<23} {2:<41} {3:<5} {4:<10} {5:<9} {6:<17} {7}".format(
 			"Acct:", "ID:", "Attached:", "GB:", "Device:", "Status:", "Zone:", "Name:"))
-		print "============================================================================================================================="		
+		print "============================================================================================================================="
+	elif headerStyle == "keys":
+		print("{0:<10s} {1:<24s} {2}".format(
+			"Acct:", "Name:", "Fingerprint:"))
+		print "============================================================================================================================="
 #
 #
 def printHelp():
@@ -313,7 +333,7 @@ def printHelp():
 	print "  **ami-xxxxxxxx - Verbose EC2 AMI Display"
 	print "  instances      - EC2 Instance List"
 	print "  **i-xxxxxxxx   - Verbose EC2 Instance Display"
-	print "  *keys          - EC2 SSH Keys"
+	print "  keys           - EC2 SSH Keys"
 	print "  *security      - EC2 Security Groups"
 	print "  *sg-xxxxxxxx   - Verbose EC2 Security Group Display"
 	print "  volumes        - EBS Volumes"
