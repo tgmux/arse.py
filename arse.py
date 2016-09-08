@@ -49,6 +49,14 @@ def main():
 						sys.exit("getElbs query failure: " + str(e[0]))
 
 					shortResources.append(elbs)
+				# individual load balancers
+				elif re.search('^elb\-', clOption):
+					try:
+						groups = arsedefs.getEc2Elbs(awsAccountName, awsRegion, session, clOption[4:])
+					except Exception as e:
+						sys.exit("getElbs query failure: " + str(e[0]))
+
+					longResources.append(groups)
 				# AMIs
 				elif clOption == "images":
 					try:

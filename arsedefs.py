@@ -213,6 +213,8 @@ class Ec2Volume:
 # Request EC2 Elastic Loadbalancers from AWS API
 def getEc2Elbs(awsAccountName, awsRegion, session, elbName):
 	ec2 = session.client('elb', region_name=awsRegion)
+	loadBalancers = {}
+	loadBalancers['LoadBalancerDescriptions'] = []
 
 	try:
 		if elbName == '':
@@ -220,7 +222,9 @@ def getEc2Elbs(awsAccountName, awsRegion, session, elbName):
 		else:
 			loadBalancers = ec2.describe_load_balancers(LoadBalancerNames=[elbName])
 	except Exception as e:
-		sys.exit("Elastic Load Balancer query failure: " + str(e[0]))
+		# All regions and accounts we check for this group will throw an error, this is fine.
+		if not re.search('LoadBalancerNotFound', e[0]):
+			sys.exit("\nLoad balancer query failure: " + str((e[0])))
 
 	# Iterate through the returned loadbalancers
 	elbs = []
@@ -481,7 +485,7 @@ def printHelp():
 	print "\narse :: Amazon ReSource Explorer"
 	print "-------------------------------------------------------"
 	print "  elb            - EC2 Elastic Loadbalancer List"
-	print "  *elb-<name>    - Verbose EC2 ELB Display"
+	print "  elb-<name>     - Verbose EC2 ELB Display"
 	print "  images         - EC2 AMI List"
 	print "  **ami-xxxxxxxx - Verbose EC2 AMI Display"
 	print "  instances      - EC2 Instance List"
