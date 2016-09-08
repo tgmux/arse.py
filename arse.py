@@ -25,7 +25,9 @@ def main():
 
 		#
 		# Loop through aws accounts - specify something on the cli later
-		resources = []
+		shortResources = []
+		longResources = []
+
 		sys.stdout.write("* Searching AWS Accounts: ")
 		sys.stdout.flush()
 		for awsAccount in arseConfig['configurations']:
@@ -46,7 +48,7 @@ def main():
 					except Exception as e:
 						sys.exit("getElbs query failure: " + str(e[0]))
 
-					resources.append(elbs)
+					shortResources.append(elbs)
 				# AMIs
 				elif clOption == "images":
 					try:
@@ -54,7 +56,7 @@ def main():
 					except Exception as e:
 						sys.exit("getImages query failure: " + str(e[0]))
 
-					resources.append(images)
+					shortResources.append(images)
 				# instances	
 				elif clOption == "instances":
 					try:
@@ -62,7 +64,7 @@ def main():
 					except Exception as e:
 						sys.exit("getInstances query failure: " + str(e[0]))
 
-					resources.append(instances)
+					shortResources.append(instances)
 				# ssh keys
 				elif clOption == "keys":
 					try:
@@ -70,15 +72,23 @@ def main():
 					except Exception as e:
 						sys.exit("getKeyPairs query failure: " + str(e[0]))
 
-					resources.append(keys)
-				# ssh keys
+					shortResources.append(keys)
+				# security groups
 				elif clOption == "security":
 					try:
 						groups = arsedefs.getEc2SecurityGroups(awsAccountName, awsRegion, session, '')
 					except Exception as e:
 						sys.exit("getSecurityGroups query failure: " + str(e[0]))
 
-					resources.append(groups)
+					shortResources.append(groups)
+				# individual security groups
+				elif re.search('^sg\-', clOption):
+					try:
+						groups = arsedefs.getEc2SecurityGroups(awsAccountName, awsRegion, session, clOption)
+					except Exception as e:
+						sys.exit("getSecurityGroups query failure: " + str(e[0]))
+
+					longResources.append(groups)
 				# ebs volumes
 				elif clOption == "volumes":
 				 	try:
@@ -86,15 +96,22 @@ def main():
 				 	except Exception as e:
 						sys.exit("getVolumes query failure: " + str(e[0]))
 
-					resources.append(volumes)
-		#
-		# Display the data we've received
-		print ""
-		arsedefs.printHeader(clOption)
+					shortResources.append(volumes)
+		# Handle what we get back. 
+		# If it's a bunch of stuff, print a header then the rest line by line
+		print "\n"
+		if len(shortResources) > 0:
+			arsedefs.printHeader(clOption)
 		
-		for resourceArray in resources:
-			for resource in resourceArray:
-				resource.printShort()
+			for resourceArray in shortResources:
+				for resource in resourceArray:
+					resource.printShort()
+
+		# If it's just one thing, hey print that too. Probably don't need to loop, but just in case i need to alter later. 
+		if len(longResources) > 0:
+			for resourceArray in longResources:
+				for resource in resourceArray:
+					resource.printLong()
 
 	print ""
 #

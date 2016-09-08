@@ -1,4 +1,5 @@
 from colorama import Fore, Back, Style, init
+import re
 import sys
 
 class Ec2Elb:
@@ -333,6 +334,8 @@ def getEc2KeyPairs(awsAccountName, awsRegion, session):
 # Request EC2 security groups from AWS API
 def getEc2SecurityGroups(awsAccountName, awsRegion, session, securityGroupId):
 	ec2 = session.client('ec2', region_name=awsRegion)
+	securityGroups = {}
+	securityGroups['SecurityGroups'] = []
 
 	try:
 		if securityGroupId == '':
@@ -340,7 +343,9 @@ def getEc2SecurityGroups(awsAccountName, awsRegion, session, securityGroupId):
 		else:
 			securityGroups = ec2.describe_security_groups(GroupIds=[securityGroupId])
 	except Exception as e:
-		sys.exit("Security groups query failure: " + str(e[0]))
+		# All regions and accounts we check for this group will throw an error, this is fine.
+		if not re.search('InvalidGroup\.NotFound', e[0]):
+			sys.exit("\nSecurity group query failure: " + str((e[0])))
 
 	# Array of returned EC2 security group objects
 	groups = []
@@ -483,7 +488,7 @@ def printHelp():
 	print "  **i-xxxxxxxx   - Verbose EC2 Instance Display"
 	print "  keys           - EC2 SSH Keys"
 	print "  security       - EC2 Security Groups"
-	print "  *sg-xxxxxxxx   - Verbose EC2 Security Group Display"
+	print "  sg-xxxxxxxx    - Verbose EC2 Security Group Display"
 	print "  volumes        - EBS Volumes"
 	print "  **vol-xxxxxxxx - Verbose EBS Volume Display"
 	print "-------------------------------------------------------"
