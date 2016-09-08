@@ -1,5 +1,8 @@
 # arse
 
+Basic wrapper for AWS API to allow ops folk to avoid the console.
+
+~~~~
 % ./arse.py
 
 arse :: Amazon ReSource Explorer
@@ -19,3 +22,4 @@ arse :: Amazon ReSource Explorer
 ex: arse [command]
 
 * - still needs to be fixt :D
+~~~~
