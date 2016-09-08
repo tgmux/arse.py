@@ -7,89 +7,7 @@ import json
 import re
 import sys
 
-#
-# Request EC2 security groups from AWS API
-def getEc2SecurityGroups(ec2, securityGroupId):
-	try:
-		if securityGroupId == "all":
-			securityGroups = ec2.describe_security_groups()
-		else:
-			securityGroups = ec2.describe_security_groups(GroupIds=[securityGroupId])
-	except Exception as e:
-		sys.exit("Security groups query failure: " + str(e[0]))
-
-	# Array of returned EC2 security group objects
-	groups = []
-	for group in securityGroups['SecurityGroups']:
-		securityGroup = arsedefs.Ec2SecurityGroup(group['GroupId'])
-		securityGroup.name = group['GroupName']
-		securityGroup.description = group['Description']
-
-		# There are two Security Group Types. One for ingress and another for egress. 
-		groupTypes = ['IpPermissionsEgress', 'IpPermissions']
-		groupPermissions = []
-		for groupType in groupTypes:
-			# Let's create an array of EC2 security group objects
-			for permission in group[groupType]:
-				groupPermission = arsedefs.Ec2SecurityGroupPermission()
-				if 'FromPort' in permission:
-					groupPermission.fromPort = permission['FromPort']
-				else:
-					groupPermission.fromPort = 'all'
-				
-				if 'ToPort' in permission:
-					groupPermission.toPort = permission['ToPort']
-				else:
-					groupPermission.fromPort = 'all'
-				
-				groupPermission.protocol = permission['IpProtocol']
-				if groupType == 'IpPermissionsEgress':
-					groupPermission.type = 'outgoing'
-				elif groupType == 'IpPermissions': 
-					groupPermission.type = 'incoming'
-
-				ranges = []
-				# Catches lists of IPs
-				if len(permission['IpRanges']) > 1:
-					for cidr in permission['IpRanges']:
-						ranges.append(cidr['CidrIp'])
-				# This is pretty much to catch 0.0.0.0/0
-				elif len(permission['IpRanges']) == 1:
-					ranges.append(permission['IpRanges'][0]['CidrIp'])
-				# When objects beside cidr ranges appear, we don't handle those yet
-				else:
-					ranges = "n/a"
-
-				# Append array of IP ranges to group permission object
-				groupPermission.ranges = ranges
-				groupPermissions.append(groupPermission)
-			# Append array of permissions objects to the security group object
-			securityGroup.permissions = groupPermissions
-		# Append security group object to array of security groups
-		groups.append(securityGroup)
-
-	if securityGroupId == "all":
-		return groups
-	else:
-		return groups[0]
-#
-#
-def displayEc2SecurityGroups(ec2, securityGroupId):
-	try:
-		groups = getEc2SecurityGroups(ec2, securityGroupId)
-	except Exception as e:
-	 	sys.exit("Get Security Groups query failure: " + str(e[0]))
-
-	if isinstance(groups, collections.Sequence):
-		print " ID:          Name:                    Description"
-		print "================================================================="
-
-		for group in groups:
-			group.printShort()
-	else:
-		groups.printLong()
-#
-#		
+		
 def main():
 	# Let's be sure we get a command line option
 	clOption = ''
@@ -114,6 +32,8 @@ def main():
 			awsAccountName = awsAccount['account']
 			sys.stdout.write(awsAccountName + ' ')
 			sys.stdout.flush()
+
+			# Create session based on account name
 			session = boto3.session.Session(profile_name=awsAccountName)
 
 			# Loop through regions - specify something on the cli later
@@ -127,6 +47,7 @@ def main():
 						sys.exit("getElbs query failure: " + str(e[0]))
 
 					resources.append(elbs)
+				# AMIs
 				elif clOption == "images":
 					try:
 						images = arsedefs.getEc2Images(awsAccountName, awsRegion, session)
@@ -150,6 +71,14 @@ def main():
 						sys.exit("getKeyPairs query failure: " + str(e[0]))
 
 					resources.append(keys)
+				# ssh keys
+				elif clOption == "security":
+					try:
+						groups = arsedefs.getEc2SecurityGroups(awsAccountName, awsRegion, session, '')
+					except Exception as e:
+						sys.exit("getSecurityGroups query failure: " + str(e[0]))
+
+					resources.append(groups)
 				# ebs volumes
 				elif clOption == "volumes":
 				 	try:

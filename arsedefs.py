@@ -124,16 +124,18 @@ class Ec2SecurityGroup:
 	'Common base class for EC2 Security Groups'
 
 	def __init__(self, securityGroupId):
+		self.awsAccountName = ''
 		self.description = ''
 		self.name = ''
 		self.permissions = []
 		self.securityGroupId = securityGroupId
 
 	def printShort(self):
-		print(" {id:<12s} {name:<24s} {description}").format(
-			name=self.name,
+		print(" {account:<9s} {id:<12s} {name:<32s} {description}").format(
+			account=self.awsAccountName,
+			name=self.name[0:31],
 			id=self.securityGroupId,
-			description=self.description)
+			description=self.description[0:60])
 
 	def printLong(self):
 		print(" {id:<12s} {name:<24s} {description}\n").format(
@@ -143,7 +145,7 @@ class Ec2SecurityGroup:
 
 		for permission in self.permissions:
 			print ("  {type:<9} {protocol:<14}  {fromPort:<6}  {toPort:<6} {ranges}".format(
-				type=permission.type,
+				type=permission.groupType,
 				protocol=Fore.CYAN + permission.protocol + Fore.RESET,
 				fromPort=permission.fromPort,
 				toPort=permission.toPort,
@@ -154,10 +156,10 @@ class Ec2SecurityGroupPermission:
 
 	def __init__(self):
 		self.fromPort = ''
+		self.groupType = ''
 		self.protocol = ''
 		self.ranges = []
 		self.toPort = ''
-		self.type = ''
 
 class Ec2Volume:
 	'Class to describe EC2 EBS Volumes'
@@ -327,6 +329,71 @@ def getEc2KeyPairs(awsAccountName, awsRegion, session):
 		keyPairs.append(keyPair)
 
 	return keyPairs
+#
+# Request EC2 security groups from AWS API
+def getEc2SecurityGroups(awsAccountName, awsRegion, session, securityGroupId):
+	ec2 = session.client('ec2', region_name=awsRegion)
+
+	try:
+		if securityGroupId == '':
+			securityGroups = ec2.describe_security_groups()
+		else:
+			securityGroups = ec2.describe_security_groups(GroupIds=[securityGroupId])
+	except Exception as e:
+		sys.exit("Security groups query failure: " + str(e[0]))
+
+	# Array of returned EC2 security group objects
+	groups = []
+	for group in securityGroups['SecurityGroups']:
+		securityGroup = Ec2SecurityGroup(group['GroupId'])
+		securityGroup.awsAccountName = awsAccountName
+		securityGroup.name = group['GroupName']
+		securityGroup.description = group['Description']
+
+		# There are two Security Group Types. One for ingress and another for egress. 
+		groupTypes = ['IpPermissionsEgress', 'IpPermissions']
+		groupPermissions = []
+		for groupType in groupTypes:
+			# Let's create an array of EC2 security group objects
+			for permission in group[groupType]:
+				groupPermission = Ec2SecurityGroupPermission()
+				if 'FromPort' in permission:
+					groupPermission.fromPort = permission['FromPort']
+				else:
+					groupPermission.fromPort = 'all'
+				
+				if 'ToPort' in permission:
+					groupPermission.toPort = permission['ToPort']
+				else:
+					groupPermission.fromPort = 'all'
+				
+				groupPermission.protocol = permission['IpProtocol']
+				if groupType == 'IpPermissionsEgress':
+					groupPermission.groupType = 'outgoing'
+				elif groupType == 'IpPermissions': 
+					groupPermission.groupType = 'incoming'
+
+				ranges = []
+				# Catches lists of IPs
+				if len(permission['IpRanges']) > 1:
+					for cidr in permission['IpRanges']:
+						ranges.append(cidr['CidrIp'])
+				# This is pretty much to catch 0.0.0.0/0
+				elif len(permission['IpRanges']) == 1:
+					ranges.append(permission['IpRanges'][0]['CidrIp'])
+				# When objects beside cidr ranges appear, we don't handle those yet
+				else:
+					ranges = "n/a"
+
+				# Append array of IP ranges to group permission object
+				groupPermission.ranges = ranges
+				groupPermissions.append(groupPermission)
+			# Append array of permissions objects to the security group object
+			securityGroup.permissions = groupPermissions
+		# Append security group object to array of security groups
+		groups.append(securityGroup)
+
+	return groups
 # Get a list of volumes or a single volumes and return an Ec2Volume object
 #  or array of Ec2Volume objects
 def getEc2Volumes(awsAccountName, awsRegion, session, volumeId):
@@ -395,6 +462,10 @@ def printHeader(headerStyle):
 		print("{0:<10s} {1:<24s} {2}".format(
 			"Acct:", "Name:", "Fingerprint:"))
 		print "============================================================================================================================="
+	elif headerStyle == "security":
+		print("{0:<10s} {1:<12s} {2:<32s} {3}".format(
+			"Acct:", "SG ID:", "Name:", "Description:"))
+		print "============================================================================================================================="
 	elif headerStyle == "volumes":
 		print ("{0:<10s} {1:<23} {2:<41} {3:<5} {4:<10} {5:<9} {6:<17} {7}".format(
 			"Acct:", "ID:", "Attached:", "GB:", "Device:", "Status:", "Zone:", "Name:"))
@@ -411,7 +482,7 @@ def printHelp():
 	print "  instances      - EC2 Instance List"
 	print "  **i-xxxxxxxx   - Verbose EC2 Instance Display"
 	print "  keys           - EC2 SSH Keys"
-	print "  *security      - EC2 Security Groups"
+	print "  security       - EC2 Security Groups"
 	print "  *sg-xxxxxxxx   - Verbose EC2 Security Group Display"
 	print "  volumes        - EBS Volumes"
 	print "  **vol-xxxxxxxx - Verbose EBS Volume Display"
