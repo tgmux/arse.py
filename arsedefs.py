@@ -2,6 +2,30 @@ from colorama import Fore, Back, Style, init
 import re
 import sys
 
+class Ec2EIp:
+	'Common base class for EC2 Elastic IP Addresses'
+
+	def __init__(self):
+		self.allocationId = ''
+		self.associationId = ''
+		self.awsAccountName = ''
+		self.instanceId = ''
+		self.networkInterfaceId = ''
+		self.networkInterfaceOwnerId = ''
+		self.publicIp = ''
+		self.privateIpAddress = ''
+		
+	def printShort(self):
+		print (" {account:<9s} {publicIp:<15} {privateIpAddress:<15} {instanceId:<20} {allocationId:<18} {associationId:<18} {networkInterfaceId:<13} {networkInterfaceOwnerId}".format(
+			account=self.awsAccountName,
+			publicIp=self.publicIp,
+			instanceId=self.instanceId,
+			allocationId=self.allocationId,
+			associationId=self.associationId,
+			networkInterfaceId=self.networkInterfaceId,
+			networkInterfaceOwnerId=self.networkInterfaceOwnerId,
+			privateIpAddress=self.privateIpAddress))
+
 class Ec2Elb:
 	'Common base class for EC2 Elastic Loadbalancers'
 
@@ -188,7 +212,7 @@ class Ec2Volume:
 		elif self.state == 'available': 
 			self.state = Fore.CYAN + 'available' + Fore.RESET
 		else:
-			self.state = Fore.Red + self.state + Fore.RESET
+			self.state = Fore.RED + self.state + Fore.RESET
 
 		self.combinedInstanceName = (self.attached['attachInstanceId'] +
 			" (" + str(self.attached['attachHostname']) + ")")
@@ -209,6 +233,33 @@ class Ec2Volume:
 				state=self.state,
 				size=self.size,
 				tagname=self.tagName)
+#
+# Request EC2 Elastic IP Addresses from AWS API
+def getEc2EIps(awsAccountName, awsRegion, session):
+	ec2 = session.client('ec2', region_name=awsRegion)
+
+	try:
+		ec2eips = ec2.describe_addresses()
+	except Exception as e:
+		sys.exit("EIPs query failure: " + str(e[0]))
+
+
+	eips = []
+	for ip in ec2eips['Addresses']:
+		eip = Ec2EIp()
+		eip.allocationId = ip['AllocationId']
+		eip.associationId = ip.get('AssociationId')
+		eip.awsAccountName = awsAccountName
+		eip.instanceId = ip.get('InstanceId')
+		eip.networkInterfaceId = ip.get('NetworkInterfaceId')
+		eip.networkInterfaceOwnerId = ip.get('NetworkInterfaceOwnerId')
+		eip.privateIpAddress = ip.get('PrivateIpAddress')
+		eip.publicIp = ip['PublicIp']
+		eips.append(eip)
+
+	return eips
+
+
 #
 # Request EC2 Elastic Loadbalancers from AWS API
 def getEc2Elbs(awsAccountName, awsRegion, session, elbName):
@@ -455,7 +506,11 @@ def getEc2Volumes(awsAccountName, awsRegion, session, volumeId):
 #
 #
 def printHeader(headerStyle):
-	if headerStyle == "elbs":
+	if headerStyle == "eips":
+		print (" {0:<9s} {1:<15} {2:<15} {3:<20} {4:<18} {5:<18} {6:<13} {7}".format(
+			"Acct:", "Public IP:", "Internal IP:", "EC2 Instance:", "Allocation ID:", "Association ID:", "Net IF ID:", "Owner:"))
+		print "==================================================================================================================================="
+	elif headerStyle == "elbs":
 		print("{0:<10s} {1:<13} {2:<24} {3:<40} {4}".format(
 			"Acct:", "VPC ID:", "ELB Name:", "Zones:", "Public DNS Name:"))
 		print "============================================================================================================================="
@@ -478,22 +533,23 @@ def printHeader(headerStyle):
 	elif headerStyle == "volumes":
 		print ("{0:<10s} {1:<23} {2:<41} {3:<5} {4:<10} {5:<9} {6:<17} {7}".format(
 			"Acct:", "ID:", "Attached:", "GB:", "Device:", "Status:", "Zone:", "Name:"))
-		print "============================================================================================================================="
+		print "==================================================================================================================================================================================="
 #
 #
 def printHelp():
 	print "\narse :: Amazon ReSource Explorer"
 	print "-------------------------------------------------------"
+	print "  eips           - EC2 Elastic IP Address List"
 	print "  elb            - EC2 Elastic Loadbalancer List"
 	print "  elb-<name>     - Verbose EC2 ELB Display"
 	print "  images         - EC2 AMI List"
-	print "  **ami-xxxxxxxx - Verbose EC2 AMI Display"
+#	print "  ami-xxxxxxxx   - Verbose EC2 AMI Display"
 	print "  instances      - EC2 Instance List"
-	print "  **i-xxxxxxxx   - Verbose EC2 Instance Display"
+#	print "  i-xxxxxxxx     - Verbose EC2 Instance Display"
 	print "  keys           - EC2 SSH Keys"
 	print "  security       - EC2 Security Groups"
 	print "  sg-xxxxxxxx    - Verbose EC2 Security Group Display"
 	print "  volumes        - EBS Volumes"
-	print "  **vol-xxxxxxxx - Verbose EBS Volume Display"
+#	print "  vol-xxxxxxxx   - Verbose EBS Volume Display"
 	print "-------------------------------------------------------"
 	print "ex: arse [command]"

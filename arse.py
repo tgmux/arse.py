@@ -1,8 +1,6 @@
 #! /usr/bin/python
 import arsedefs
 import boto3
-import collections
-from colorama import Fore, Back, Style, init
 import json
 import re
 import sys
@@ -105,6 +103,14 @@ def main():
 						sys.exit("getVolumes query failure: " + str(e[0]))
 
 					shortResources.append(volumes)
+				# elastic IP addresses
+				elif clOption == "eips":
+					try:
+						eips = arsedefs.getEc2EIps(awsAccountName, awsRegion, session)
+					except Exception as e:
+						sys.exit("get EIPs query failure: " + str(e[0]))
+
+					shortResources.append(eips)
 		# Handle what we get back. 
 		# If it's a bunch of stuff, print a header then the rest line by line
 		print "\n"
