@@ -6,8 +6,6 @@ class Ec2EIp:
 	'Common base class for EC2 Elastic IP Addresses'
 
 	def __init__(self):
-		self.allocationId = ''
-		self.associationId = ''
 		self.awsAccountName = ''
 		self.instanceId = ''
 		self.networkInterfaceId = ''
@@ -16,12 +14,21 @@ class Ec2EIp:
 		self.privateIpAddress = ''
 		
 	def printShort(self):
-		print (" {account:<9s} {publicIp:<15} {privateIpAddress:<15} {instanceId:<20} {allocationId:<18} {associationId:<18} {networkInterfaceId:<13} {networkInterfaceOwnerId}".format(
+
+		# Colors are the new white text
+		if self.privateIpAddress is None:
+			self.privateIpAddress = Fore.RED + "Detached       " + Fore.RESET
+
+		if self.instanceId is None:
+			self.instanceId = Fore.CYAN + "N/A                 " + Fore.RESET
+
+		# else:
+		# 	self.privateIpAddress = Fore.CYAN + self.privateIpAddress + Fore.RESET
+
+		print (" {account:<9s} {publicIp:<15} {privateIpAddress:<15} {instanceId:<20} {networkInterfaceId:<13} {networkInterfaceOwnerId}".format(
 			account=self.awsAccountName,
 			publicIp=self.publicIp,
 			instanceId=self.instanceId,
-			allocationId=self.allocationId,
-			associationId=self.associationId,
 			networkInterfaceId=self.networkInterfaceId,
 			networkInterfaceOwnerId=self.networkInterfaceOwnerId,
 			privateIpAddress=self.privateIpAddress))
@@ -233,6 +240,26 @@ class Ec2Volume:
 				state=self.state,
 				size=self.size,
 				tagname=self.tagName)
+
+class IamUser:
+	'Class for IAM Users'
+
+	def __init__(self):
+		self.awsAccountName = ''
+		self.arn = ''
+		self.createDate = ''
+		self.path = ''
+		self.passwordLastUsed = ''
+		self.userId = ''
+		self.userName = ''
+
+	def printShort(self):
+		print (" {account:<9} {userName:<21} {userId:<22} {createDate:<27s} {passwordLastUsed:<27s}".format(
+			account=self.awsAccountName,
+			userName=self.userName,
+			userId=self.userId,
+			createDate=str(self.createDate),
+			passwordLastUsed=str(self.passwordLastUsed)))
 #
 # Request EC2 Elastic IP Addresses from AWS API
 def getEc2EIps(awsAccountName, awsRegion, session):
@@ -504,12 +531,35 @@ def getEc2Volumes(awsAccountName, awsRegion, session, volumeId):
 
 	return returnedVolumes
 #
+# Get a list of all IAM users
+def getIamUsers(awsAccountName, session):
+	iam = session.client('iam')
+	try:
+		users = iam.list_users()
+	except Exception as e:
+		sys.exit("IAM Users query failure:" + str(e[0]))
+
+	returnedUsers = []
+	for user in users['Users']:
+		returnedUser = IamUser()
+		returnedUser.awsAccountName = awsAccountName
+		returnedUser.arn = user['Arn']
+		returnedUser.createDate = user['CreateDate']
+		returnedUser.passwordLastUsed = user.get('PasswordLastUsed')
+		returnedUser.path = user['Path']
+		returnedUser.userName = user['UserName']
+		returnedUser.userId = user['UserId']
+
+		returnedUsers.append(returnedUser)
+
+	return returnedUsers
+#
 #
 def printHeader(headerStyle):
 	if headerStyle == "eips":
-		print (" {0:<9s} {1:<15} {2:<15} {3:<20} {4:<18} {5:<18} {6:<13} {7}".format(
-			"Acct:", "Public IP:", "Internal IP:", "EC2 Instance:", "Allocation ID:", "Association ID:", "Net IF ID:", "Owner:"))
-		print "==================================================================================================================================="
+		print (" {0:<9s} {1:<15} {2:<15} {3:<20} {4:<13} {5}".format(
+			"Acct:", "Public IP:", "Private IP:", "EC2 Instance:", "Net IF ID:", "Owner:"))
+		print "==========================================================================================="
 	elif headerStyle == "elbs":
 		print("{0:<10s} {1:<13} {2:<24} {3:<40} {4}".format(
 			"Acct:", "VPC ID:", "ELB Name:", "Zones:", "Public DNS Name:"))
@@ -530,6 +580,10 @@ def printHeader(headerStyle):
 		print("{0:<10s} {1:<12s} {2:<32s} {3}".format(
 			"Acct:", "SG ID:", "Name:", "Description:"))
 		print "============================================================================================================================="
+	elif headerStyle == "users":
+		print ("{0:<10s} {1:<21} {2:<22} {3:<27} {4:<27}".format(
+			"Acct:", "Username:", "User ID:", "Created:", "Last Used:"))
+		print "============================================================================================================================="
 	elif headerStyle == "volumes":
 		print ("{0:<10s} {1:<23} {2:<41} {3:<5} {4:<10} {5:<9} {6:<17} {7}".format(
 			"Acct:", "ID:", "Attached:", "GB:", "Device:", "Status:", "Zone:", "Name:"))
@@ -549,6 +603,7 @@ def printHelp():
 	print "  keys           - EC2 SSH Keys"
 	print "  security       - EC2 Security Groups"
 	print "  sg-xxxxxxxx    - Verbose EC2 Security Group Display"
+	print "  users			- IAM User List"
 	print "  volumes        - EBS Volumes"
 #	print "  vol-xxxxxxxx   - Verbose EBS Volume Display"
 	print "-------------------------------------------------------"

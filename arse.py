@@ -39,8 +39,16 @@ def main():
 			# Loop through regions - specify something on the cli later
 			awsRegions = awsAccount['regions']
 			for awsRegion in awsRegions:
+				# elastic IP addresses
+				if clOption == "eips":
+					try:
+						eips = arsedefs.getEc2EIps(awsAccountName, awsRegion, session)
+					except Exception as e:
+						sys.exit("get EIPs query failure: " + str(e[0]))
+
+					shortResources.append(eips)
 				# elastic load balancers	
-				if clOption == "elbs":
+				elif clOption == "elbs":
 					try:
 						elbs = arsedefs.getEc2Elbs(awsAccountName, awsRegion, session, '')
 					except Exception as e:
@@ -95,6 +103,14 @@ def main():
 						sys.exit("getSecurityGroups query failure: " + str(e[0]))
 
 					longResources.append(groups)
+				# iam users
+				elif clOption == "users":
+					try:
+						users = arsedefs.getIamUsers(awsAccountName, session)
+					except Exception as e:
+						sys.exit("getIamUsers query failure: " + str(e[0]))
+
+					shortResources.append(users)
 				# ebs volumes
 				elif clOption == "volumes":
 				 	try:
@@ -103,14 +119,6 @@ def main():
 						sys.exit("getVolumes query failure: " + str(e[0]))
 
 					shortResources.append(volumes)
-				# elastic IP addresses
-				elif clOption == "eips":
-					try:
-						eips = arsedefs.getEc2EIps(awsAccountName, awsRegion, session)
-					except Exception as e:
-						sys.exit("get EIPs query failure: " + str(e[0]))
-
-					shortResources.append(eips)
 		# Handle what we get back. 
 		# If it's a bunch of stuff, print a header then the rest line by line
 		print "\n"
