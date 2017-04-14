@@ -14,16 +14,9 @@ class Ec2EIp:
 		self.privateIpAddress = ''
 		
 	def printShort(self):
-
 		# Colors are the new white text
 		if self.privateIpAddress is None:
 			self.privateIpAddress = Fore.RED + "Detached       " + Fore.RESET
-
-		if self.instanceId is None:
-			self.instanceId = Fore.CYAN + "N/A                 " + Fore.RESET
-
-		# else:
-		# 	self.privateIpAddress = Fore.CYAN + self.privateIpAddress + Fore.RESET
 
 		print (" {account:<9s} {publicIp:<15} {privateIpAddress:<15} {instanceId:<20} {networkInterfaceId:<13} {networkInterfaceOwnerId}".format(
 			account=self.awsAccountName,
@@ -274,7 +267,7 @@ def getEc2EIps(awsAccountName, awsRegion, session):
 	eips = []
 	for ip in ec2eips['Addresses']:
 		eip = Ec2EIp()
-		eip.allocationId = ip['AllocationId']
+		eip.allocationId = ip.get('AllocationId')
 		eip.associationId = ip.get('AssociationId')
 		eip.awsAccountName = awsAccountName
 		eip.instanceId = ip.get('InstanceId')
@@ -582,7 +575,7 @@ def printHeader(headerStyle):
 		print "============================================================================================================================="
 	elif headerStyle == "users":
 		print ("{0:<10s} {1:<21} {2:<22} {3:<27} {4:<27}".format(
-			"Acct:", "Username:", "User ID:", "Created:", "Last Used:"))
+			"Acct:", "Username:", "User ID:", "Created:", "Password Last Used:"))
 		print "============================================================================================================================="
 	elif headerStyle == "volumes":
 		print ("{0:<10s} {1:<23} {2:<41} {3:<5} {4:<10} {5:<9} {6:<17} {7}".format(

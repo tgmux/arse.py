@@ -119,15 +119,26 @@ def main():
 						sys.exit("getVolumes query failure: " + str(e[0]))
 
 					shortResources.append(volumes)
+
+		# Get ready to display our data
+		print "\n"
+		lineCounter = 1
+		arbitraryPaginationMax = 80
+
 		# Handle what we get back. 
 		# If it's a bunch of stuff, print a header then the rest line by line
-		print "\n"
 		if len(shortResources) > 0:
 			arsedefs.printHeader(clOption)
-		
+
 			for resourceArray in shortResources:
 				for resource in resourceArray:
+					# Arbitrary paginator at 40 lines
+					if lineCounter % arbitraryPaginationMax == 0:
+						arsedefs.printHeader(clOption)
+
 					resource.printShort()
+					lineCounter += 1
+
 
 		# If it's just one thing, hey print that too. Probably don't need to loop, but just in case i need to alter later. 
 		if len(longResources) > 0:
