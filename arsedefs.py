@@ -44,12 +44,19 @@ class Ec2Elb:
 		self.vpcId = ''
 
 	def printShort(self):
-		print (" {account:<9s} {vpcid:<13} {lbname:<32} {zones:<40} {dnsname}".format(
+		# funky work to condense the AZs into an easily readable nugget 
+		zones = []
+		for zone in self.availabilityZones:
+			split_zone = zone.split("-")
+			region = split_zone[0] + "-" + split_zone[1]
+			zones.append(split_zone[2])
+
+		print (" {account:<5s} {vpcid:<13} {lbname:<41} {zones:<33} {dnsname}".format(
 			account=self.awsAccountName,
 			lbname=Style.BRIGHT + self.elbName + Style.RESET_ALL,
-			dnsname=self.dnsName[:-14],
+			dnsname=self.dnsName[:-18],
 			vpcid=self.vpcId,
-			zones=str(self.availabilityZones)))
+			zones=region + " " + str(zones)))
 
 	def printLong(self):
 		print("- Created: {created}".format(
@@ -308,7 +315,7 @@ def getEc2Elbs(awsAccountName, awsRegion, session, elbName):
 		elb.policies = lb['Policies']
 		elb.securityGroups = lb['SecurityGroups']
 		elb.subnets = lb['Subnets']
-		elb.vpcId = lb['VPCId']
+		elb.vpcId = lb.get('VPCId')
 
 		# Loop over instances to which ELB is attached
 		instances = []
@@ -554,9 +561,9 @@ def printHeader(headerStyle):
 			"Acct:", "Public IP:", "Private IP:", "EC2 Instance:", "Net IF ID:", "Owner:"))
 		print "==========================================================================================="
 	elif headerStyle == "elbs":
-		print("{0:<10s} {1:<13} {2:<24} {3:<40} {4}".format(
-			"Acct:", "VPC ID:", "ELB Name:", "Zones:", "Public DNS Name:"))
-		print "============================================================================================================================="
+		print("{0:<6s} {1:<13} {2:<33} {3:<33} {4}".format(
+			"Acct:", "VPC ID:", "ELB Name:", "Zones:", "Public DNS Name:   (.elb.amazonaws.com)"))
+		print "================================================================================================================================================="
 	elif headerStyle == "images":
 		print("{0:<10s} {1:<14s} {2:<70s} {3:<7s} {4:<30s}".format(
 			"Acct:", "ID:", "Name:", "vType:", "Creation Date:"))
@@ -587,7 +594,7 @@ def printHelp():
 	print "\narse :: Amazon ReSource Explorer"
 	print "-------------------------------------------------------"
 	print "  eips           - EC2 Elastic IP Address List"
-	print "  elb            - EC2 Elastic Loadbalancer List"
+	print "  elbs           - EC2 Elastic Loadbalancer List"
 	print "  elb-<name>     - Verbose EC2 ELB Display"
 	print "  images         - EC2 AMI List"
 #	print "  ami-xxxxxxxx   - Verbose EC2 AMI Display"
