@@ -1,3 +1,4 @@
+import boto3
 from colorama import Fore, Back, Style, init
 import re
 import sys
@@ -223,7 +224,7 @@ class Ec2Volume:
 
 		self.combinedInstanceName = (self.attached['attachInstanceId'] +
 			" (" + str(self.attached['attachHostname']) + ")")
-		print (" {account:<9s} {volumeId:<22}  {instance:<41} {size:<5} {device:<10} {state:<19} {zone:<16}  {tagname}".format(
+		print (" {account:<9s} {volumeId:<22}  {instance:<41} {size:<5} {device:<10} {state:<19} {zone:<16} {type:<3} {tagname}".format(
 				account=self.awsAccountName,
 				zone=self.availabilityZone,
 				volumeId=self.volumeId,
@@ -231,6 +232,7 @@ class Ec2Volume:
 				state=self.state,
 				device=self.attached['attachDevice'],
 				size=self.size,
+				type=self.volumeType,
 				tagname=self.tagName))
 
 	def printLong(self):
@@ -260,6 +262,118 @@ class IamUser:
 			userId=self.userId,
 			createDate=str(self.createDate),
 			passwordLastUsed=str(self.passwordLastUsed)))
+
+class RdsInstance:
+	'Class for RDS Instances'
+
+	def __init__(self, dbInstanceIdentifier):
+		self.allocatedStorage = ''
+		self.awsAccountName = ''
+		self.availabilityZone = ''
+		self.backupRetentionPeriod = ''
+		self.copyTagsToSnapshot = bool
+		self.dbInstanceArn = ''
+		self.dbInstanceClass = ''
+		self.dbInstanceIdentifier = dbInstanceIdentifier
+		self.dbInstancePort = ''
+		self.dbInstanceStatus = ''
+		self.dbiResourceId = ''
+		self.dbName = ''
+		self.dbParameterGroups = ''
+		self.dbSecurityGroups = ''
+		self.dbSubnetGroup = []
+		self.dbSubnetGroupDescription = ''
+		self.dbSubnetGroupName = ''
+		self.dbSubnetGroupStatus = ''
+		self.endpointAddress = ''
+		self.endpointId = ''
+		self.endpointPort = ''
+		self.engine = ''
+		self.engineVersion = ''
+		self.enhancedMonitoringResourceArn = ''
+		self.instanceCreateTime = ''
+		self.latestRestorableTime = ''
+		self.masterUsername = ''
+		self.monitoringInterval = ''
+		self.monitoringRoleArn = ''
+		self.multiAZ = bool
+		self.optionGroupMemberships = []
+		self.preferredBackupWindow = ''
+		self.preferredMaintenanceWindow = ''
+		self.publiclyAccessible = ''
+		self.readReplicaDBInstanceIdentifiers = []
+		self.secondaryAvailabilityZone = ''
+		self.storageType = ''
+		self.storageEncrypted = bool
+		self.vpcSecurityGroups = []
+		self.vpcId = ''
+
+	def printShort(self):
+		print (" {account:<6} {dbidentifier:<18} {storage:<4} {storageType:<6} {paz:<14} {saz:<14} {engine:<8} {version:<10} {type:<14} {maintwindow:<21} {backupwindow}" .format(
+			account=self.awsAccountName,
+			backupwindow=self.preferredBackupWindow,
+			dbidentifier=self.dbInstanceIdentifier,
+			engine=self.engine,
+			maintwindow=self.preferredMaintenanceWindow,
+			paz=self.availabilityZone,
+			saz=self.secondaryAvailabilityZone,
+			storage=self.allocatedStorage,
+			storageType=self.storageType,
+			type=self.dbInstanceClass,
+			version=self.engineVersion))
+
+	def printLong(self):
+		print ("--[ account: {account} ]---------------------------------".format(account=self.awsAccountName))
+		print ("{dbIdentifierField:<20} {dbidentifier} \n{engineField:<20} {engine} {version}".format(
+			dbIdentifierField="identifier:",
+			dbidentifier=self.dbInstanceIdentifier,
+			engineField="engine:",
+			engine=self.engine,
+			version=self.engineVersion))
+
+		# Color the encrypted field
+		if self.storageEncrypted == False:
+			self.storageEncrypted = Fore.RED + 'false' + Fore.RESET
+		else:
+			self.storageEncrypted = Fore.GREEN + 'true' + Fore.RESET
+
+		print ("{storageField:<20} {storageSize}GB {storageType} \n{instanceField:<20} {instanceType} \n{encryptedField:<20} {storageEncrypted}".format(
+			encryptedField="encrypted:",
+			instanceField="instance:",
+			instanceType=self.dbInstanceClass,
+			storageField="storage:",
+			storageEncrypted=self.storageEncrypted,
+			storageSize=self.allocatedStorage,
+			storageType=self.storageType))
+		print ("{endpointField:<20} {endpointAddress}:{endpointPort} \n{dbInstanceArnField:<20} {dbInstanceArn}".format(
+			dbInstanceArnField="instance arn:",
+			dbInstanceArn=self.dbInstanceArn,
+			endpointField="endpoint:",
+			endpointAddress=self.endpointAddress,
+			endpointPort=self.endpointPort))
+		print ("{regionField:<20} {primaryAZ} // {secondaryAZ} \n{monitoringField:<20} {monitoringInterval} \n{masterNameField:<20} {masterUsername}".format(
+			masterNameField="master uname:",
+			masterUsername=self.masterUsername,
+			monitoringField="monitor interval:",
+			monitoringInterval=self.monitoringInterval,
+			primaryAZ=self.availabilityZone,
+			regionField="region:",
+			secondaryAZ=self.secondaryAvailabilityZone))
+		print ("\n--[ maintenance: ]------------------------------------".format(account=self.awsAccountName))
+		print ("{createdField:<20} {instanceCreateTime} \n{restorableField:<20} {latestRestorableTime}".format(
+			createdField="created:",
+			instanceCreateTime=self.instanceCreateTime,
+			restorableField="latest restore:",
+			latestRestorableTime=self.latestRestorableTime))
+		print ("{maintenanceField:<20} {preferredMaintenanceWindow} \n{backupField:<20} {preferredBackupWindow} \n{retentionField:<20} {retentionPeriod}".format(
+			backupField="backup window:",
+			maintenanceField="maintenance window:",
+			preferredBackupWindow=self.preferredBackupWindow,
+			preferredMaintenanceWindow=self.preferredMaintenanceWindow,
+			retentionField="retention period:",
+			retentionPeriod=self.backupRetentionPeriod))
+		print "\n"
+
 #
 # Request EC2 Elastic IP Addresses from AWS API
 def getEc2EIps(awsAccountName, awsRegion, session):
@@ -269,7 +383,6 @@ def getEc2EIps(awsAccountName, awsRegion, session):
 		ec2eips = ec2.describe_addresses()
 	except Exception as e:
 		sys.exit("EIPs query failure: " + str(e[0]))
-
 
 	eips = []
 	for ip in ec2eips['Addresses']:
@@ -285,7 +398,6 @@ def getEc2EIps(awsAccountName, awsRegion, session):
 		eips.append(eip)
 
 	return eips
-
 
 #
 # Request EC2 Elastic Loadbalancers from AWS API
@@ -526,6 +638,7 @@ def getEc2Volumes(awsAccountName, awsRegion, session, volumeId):
 		returnedVolume.state = volume['State']
 		returnedVolume.tagName = tagName
 		returnedVolume.awsAccountName = awsAccountName
+		returnedVolume.volumeType = volume['VolumeType']
 
 		returnedVolumes.append(returnedVolume)
 
@@ -553,6 +666,60 @@ def getIamUsers(awsAccountName, session):
 		returnedUsers.append(returnedUser)
 
 	return returnedUsers
+# 
+# Get a list of all RDS Instances
+def getRdsInstances(awsAccountName, awsRegion, session, dbInstanceIdentifier):
+	rds = session.client('rds', region_name=awsRegion)
+	try:
+		if dbInstanceIdentifier == '':
+			instances = rds.describe_db_instances()
+		else:
+			instances = rds.describe_db_instances(DBInstanceIdentifier=dbInstanceIdentifier)
+	except Exception as e:
+		instances = {}
+		instances['DBInstances'] = []
+		
+		# An error code of DBInstanceNotFound indicates obviously, the db instance we're searching for
+		#	by name does not exist. Let's not die on that, shall we?
+		if e.response['Error']['Code'] != 'DBInstanceNotFound':
+			sys.exit("rds instances query failure: " + str(e[0]))
+
+	returnedInstances = []
+	# Always an array, even of 1. Iterate through any volumes returned.
+	for instance in instances['DBInstances']:
+		returnedInstance = RdsInstance(instance['DBInstanceIdentifier'])
+		returnedInstance.allocatedStorage = instance['AllocatedStorage']
+		returnedInstance.awsAccountName = awsAccountName
+		returnedInstance.availabilityZone = instance['AvailabilityZone']
+		returnedInstance.backupRetentionPeriod = instance['BackupRetentionPeriod']
+		returnedInstance.dbInstanceArn = instance['DBInstanceArn']
+		returnedInstance.dbInstanceClass = instance['DBInstanceClass']
+		returnedInstance.dbInstanceStatus = instance['DBInstanceStatus']
+		returnedInstance.endpointAddress = instance['Endpoint']['Address']
+		returnedInstance.endpointId = instance['Endpoint']['HostedZoneId']
+		returnedInstance.endpointPort = instance['Endpoint']['Port']
+		returnedInstance.engine = instance['Engine']
+		returnedInstance.engineVersion = instance['EngineVersion']
+		returnedInstance.instanceCreateTime = instance['InstanceCreateTime']
+		returnedInstance.latestRestorableTime = instance['LatestRestorableTime']
+		returnedInstance.optionGroupMemberships = '' #this is an array we need to do something with
+		returnedInstance.masterUsername = instance['MasterUsername']
+		returnedInstance.monitoringInterval = instance['MonitoringInterval']
+		returnedInstance.vpcSecurityGroups = '' #this is an array we need to do something with
+		returnedInstance.preferredBackupWindow = instance['PreferredBackupWindow']
+		returnedInstance.preferredMaintenanceWindow = instance['PreferredMaintenanceWindow']
+		returnedInstance.secondaryAvailabilityZone = instance.get('SecondaryAvailabilityZone')
+		returnedInstance.storageEncrypted = instance['StorageEncrypted']
+		
+		# Formatting for readability
+		if instance['StorageType'] == 'standard': 
+			returnedInstance.storageType = 'std'
+		else:
+			returnedInstance.storageType = instance['StorageType']
+
+		returnedInstances.append(returnedInstance)
+
+	return returnedInstances
 #
 #
 def printHeader(headerStyle):
@@ -576,6 +743,10 @@ def printHeader(headerStyle):
 		print("{0:<10s} {1:<24s} {2}".format(
 			"Acct:", "Name:", "Fingerprint:"))
 		print "============================================================================================================================="
+	elif headerStyle == "rds":
+		print ("{0:<6}  {1:<18} {2:<11} {3:<14} {4:<14} {5:<8} {6:<10} {7:<14} {8:<21} {9}" .format(
+			"Acct:", "Name:", "Storage:", "Primary AZ:", "Second AZ:", "Engine:", "Version:", "Type:", "Maintenance Window:", "Backup Window:"))
+		print "============================================================================================================================================"
 	elif headerStyle == "security":
 		print("{0:<10s} {1:<12s} {2:<32s} {3}".format(
 			"Acct:", "SG ID:", "Name:", "Description:"))
@@ -591,20 +762,22 @@ def printHeader(headerStyle):
 #
 #
 def printHelp():
-	print "\narse :: Amazon ReSource Explorer"
+	print "\narse :: Amazon Reource Explorer"
 	print "-------------------------------------------------------"
 	print "  eips           - EC2 Elastic IP Address List"
 	print "  elbs           - EC2 Elastic Loadbalancer List"
 	print "  elb-<name>     - Verbose EC2 ELB Display"
 	print "  images         - EC2 AMI List"
-#	print "  ami-xxxxxxxx   - Verbose EC2 AMI Display"
+	print " *ami-xxxxxxxx   - Verbose EC2 AMI Display"
 	print "  instances      - EC2 Instance List"
-#	print "  i-xxxxxxxx     - Verbose EC2 Instance Display"
+	print " *i-xxxxxxxx     - Verbose EC2 Instance Display"
 	print "  keys           - EC2 SSH Keys"
+	print "  rds            - RDS Instances"
+	print "  rds-xxxxxxx    - Verbose RDS Instance"
 	print "  security       - EC2 Security Groups"
 	print "  sg-xxxxxxxx    - Verbose EC2 Security Group Display"
-	print "  users			- IAM User List"
+	print "  users          - IAM User List"
 	print "  volumes        - EBS Volumes"
-#	print "  vol-xxxxxxxx   - Verbose EBS Volume Display"
+ 	print " *vol-xxxxxxxx   - Verbose EBS Volume Display"
 	print "-------------------------------------------------------"
-	print "ex: arse [command]"
+	print "ex: arse [command]\n"

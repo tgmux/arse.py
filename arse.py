@@ -16,8 +16,8 @@ def main():
 
 		# Load JSON config file
 		try:
-			with open('arse.conf.json') as arse_config_json:
-				arse_config = json.load(arse_config_json)
+			with open('arse.conf.json') as arseConfigJson:
+				arseConfig = json.load(arseConfigJson)
 		except Exception as e:
 			sys.exit("Unable to open json config file: " + str(e))
 
@@ -28,7 +28,7 @@ def main():
 
 		sys.stdout.write("* Searching AWS Accounts: ")
 		sys.stdout.flush()
-		for aws_account in arse_config['configurations']:
+		for aws_account in arseConfig['configurations']:
 			aws_account_name = aws_account['account']
 			sys.stdout.write(aws_account_name + ' ')
 			sys.stdout.flush()
@@ -87,6 +87,22 @@ def main():
 						sys.exit("getKeyPairs query failure: " + str(e[0]))
 
 					short_resources.append(keys)
+				# rds instances
+				elif cli_option == "rds":
+					try:
+						rinstances = arsedefs.getRdsInstances(aws_account_name, aws_region, session, '')
+					except Exception as e:
+						sys.exit("getRdsInstances query failure: " + str(e[0]))
+
+					short_resources.append(rinstances)
+				# rds instances
+				elif re.search('^rds\-', cli_option):
+					try:
+						rinstances = arsedefs.getRdsInstances(aws_account_name, aws_region, session, cli_option[4:])
+					except Exception as e:
+						sys.exit("getRdsInstances query failure: " + str(e[0]))
+
+					long_resources.append(rinstances)
 				# security groups
 				elif cli_option == "security":
 					try:
